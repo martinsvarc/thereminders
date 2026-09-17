@@ -1,0 +1,149 @@
+:root { --bg: #f4efe4; --card: #ece5d4; --card-hover: #e5ddc9; --gold: #9e700f; --warm: #8a6c2c; --cyan: #177670; --coral: #b23e34; --green: #2b7a31; --purple: #674aa8; --blue: #2c649e; --text: #3a3123; --muted: #6e634e; --soft: #4a3f2d; --border: rgba(42,34,20,0.2); }
+@keyframes fadeInUp { 
+  0% { opacity: 0.3; transform: translateY(0px); }
+  100% { opacity: 1; transform: translateY(-6px); }
+}
+.card .viz { height: 140px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; position: relative; border-radius: 10px; overflow: hidden; }
+.viz-dot { width: 100%; height: 100%; position: relative; background: radial-gradient(circle, rgba(158,112,15,0.12) 0%, transparent 70%); }
+.viz-dot::after { content: ""; position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; background: var(--gold); border-radius: 50%; transform: translate(-50%, -50%); animation: 2.5s ease-in-out 0s infinite normal none running pulse; box-shadow: 0 0 30px var(--gold),0 0 60px rgba(158,112,15,0.48); }
+.viz-dot .grid-dot { position: absolute; width: 3px; height: 3px; background: rgba(42,34,20,0.14); border-radius: 50%; }
+@keyframes pulse { 
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.5; }
+}
+.viz-paths { width: 100%; height: 100%; position: relative; overflow: hidden; }
+.viz-paths .path { position: absolute; height: 1.5px; border-radius: 2px; left: 0px; right: 0px; opacity: 0.12; }
+.viz-paths .path.active { opacity: 0.8; box-shadow: 0px 0px 6px; }
+.viz-paths .path-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; animation: 5s linear 0s infinite normal none running moveDot; }
+@keyframes moveDot { 
+  0% { left: 5%; }
+  100% { left: 90%; }
+}
+.viz-pendulum { width: 100%; height: 100%; display: flex; align-items: flex-start; justify-content: center; padding-top: 10px; }
+.viz-pendulum .arm { width: 2px; height: 80px; background: var(--muted); transform-origin: center top; animation: 3s ease-in-out 0s infinite normal none running swing; position: relative; border-radius: 2px; opacity: 0.6; }
+.viz-pendulum .weight { width: 20px; height: 20px; background: var(--coral); border-radius: 50%; position: absolute; bottom: -10px; left: -9px; box-shadow: rgba(178,62,52,0.72) 0px 0px 15px; opacity: 0.7; }
+.viz-pendulum .people { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
+.viz-pendulum .person { width: 5px; height: 12px; background: rgba(42,34,20,0.24); border-radius: 3px; }
+@keyframes swing { 
+  0%, 100% { transform: rotate(-22deg); }
+  50% { transform: rotate(22deg); }
+}
+.viz-gauge { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.gauge-bar { width: 75%; height: 6px; background: linear-gradient(90deg,var(--coral),var(--green) 45%,var(--gold) 50%,var(--green) 55%,var(--coral)); border-radius: 3px; position: relative; opacity: 0.7; }
+.gauge-bar .marker { position: absolute; top: -5px; left: 50%; width: 3px; height: 16px; background: rgb(42,34,20); border-radius: 2px; transform: translateX(-50%); box-shadow: rgba(42,34,20,0.96) 0px 0px 8px; }
+.gauge-label { display: flex; justify-content: space-between; width: 75%; font-family: system-ui, sans-serif; }
+.gauge-label span { font-size: 9px; color: var(--muted); }
+.gauge-center { font-size: 10px; color: var(--gold); font-weight: 600; letter-spacing: 2px; font-family: system-ui, sans-serif; }
+.viz-wave { width: 100%; height: 100%; display: flex; align-items: center; overflow: hidden; }
+.viz-wave svg { width: 100%; height: 80px; }
+.viz-wave .wave-path { animation: 4s linear 0s infinite normal none running waveMove; }
+@keyframes waveMove { 
+  0% { transform: translateX(0px); }
+  100% { transform: translateX(-50%); }
+}
+.viz-circles { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
+.viz-circles .c { width: 65px; height: 65px; border-radius: 50%; position: absolute; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; font-family: system-ui, sans-serif; }
+.viz-circles .c1 { background: rgba(158,112,15,0.24); border: 1.5px solid rgba(158,112,15,0.72); animation: 4.5s ease-in-out 0s infinite normal none running mergeLeft; }
+.viz-circles .c2 { background: rgba(23,118,112,0.24); border: 1.5px solid rgba(23,118,112,0.72); animation: 4.5s ease-in-out 0s infinite normal none running mergeRight; }
+@keyframes mergeLeft { 
+  0%, 100% { transform: translateX(-28px); }
+  50% { transform: translateX(-8px); }
+}
+@keyframes mergeRight { 
+  0%, 100% { transform: translateX(28px); }
+  50% { transform: translateX(8px); }
+}
+.viz-ring { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
+.viz-ring .ring { position: absolute; border: 1.5px solid; border-radius: 50%; animation: 3.5s ease-out 0s infinite normal none running expandRing; }
+.viz-ring .ring:nth-child(1) { animation-delay: 0s; border-color: rgba(158,112,15,1.00); }
+.viz-ring .ring:nth-child(2) { animation-delay: 1.2s; border-color: rgba(158,112,15,0.72); }
+.viz-ring .ring:nth-child(3) { animation-delay: 2.4s; border-color: rgba(158,112,15,0.36); }
+.viz-ring .core { width: 10px; height: 10px; background: var(--gold); border-radius: 50%; z-index: 2; box-shadow: rgba(158,112,15,0.96) 0px 0px 15px; }
+@keyframes expandRing { 
+  0% { width: 10px; height: 10px; opacity: 1; }
+  100% { width: 110px; height: 110px; opacity: 0; }
+}
+.viz-boomerang { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.viz-boomerang .arrow { width: 8px; height: 8px; background: var(--gold); border-radius: 50%; position: absolute; animation: 3.5s ease-in-out 0s infinite normal none running boomerangPath; box-shadow: 0 0 8px var(--gold); }
+@keyframes boomerangPath { 
+  0% { transform: translate(0px, 0px); opacity: 1; }
+  25% { transform: translate(55px, -25px); opacity: 1; }
+  50% { transform: translate(70px, 0px); opacity: 0.5; }
+  75% { transform: translate(55px, 25px); opacity: 0.7; }
+  100% { transform: translate(0px, 0px); opacity: 1; }
+}
+.viz-sail { width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 20px; position: relative; }
+.viz-sail .boat { width: 55px; height: 7px; background: var(--muted); border-radius: 0px 0px 50% 50%; position: relative; opacity: 0.5; }
+.viz-sail .mast { width: 1.5px; height: 48px; background: var(--muted); position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%); opacity: 0.5; }
+.viz-sail .sail-shape { width: 0px; height: 0px; border-left: 28px solid rgba(158,112,15,0.60); border-top: 18px solid transparent; border-bottom: 22px solid transparent; position: absolute; bottom: 14px; left: calc(50% + 1px); animation: 3.5s ease-in-out 0s infinite alternate none running fillSail; }
+@keyframes fillSail { 
+  0% { border-left-width: 14px; opacity: 0.2; }
+  100% { border-left-width: 32px; opacity: 0.7; }
+}
+.viz-sail .wind { position: absolute; top: 20px; right: 20px; display: flex; gap: 4px; flex-direction: column; }
+.viz-sail .wind-line { height: 1.5px; background: rgba(23,118,112,0.60); border-radius: 1px; animation: 2.5s ease-in-out 0s infinite normal none running windBlow; }
+.viz-sail .wind-line:nth-child(1) { width: 18px; }
+.viz-sail .wind-line:nth-child(2) { animation-delay: 0.4s; width: 28px; }
+.viz-sail .wind-line:nth-child(3) { animation-delay: 0.8s; width: 14px; }
+@keyframes windBlow { 
+  0%, 100% { opacity: 0.15; transform: translateX(0px); }
+  50% { opacity: 0.5; transform: translateX(-8px); }
+}
+.viz-mirror { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.viz-mirror .side { width: 55px; height: 85px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.viz-mirror .image-side { background: rgba(158,112,15,0.14); border: 1px solid rgba(158,112,15,0.48); }
+.viz-mirror .reflect-side { background: rgba(23,118,112,0.10); border: 1px solid rgba(23,118,112,0.24); animation: 5s ease-in-out 0s infinite normal none running mirrorDelay; }
+.viz-mirror .divider { width: 2px; height: 95px; background: linear-gradient(to bottom,transparent,var(--muted),transparent); opacity: 0.3; }
+.viz-mirror .figure { width: 14px; height: 28px; border-radius: 7px 7px 4px 4px; }
+.viz-mirror .image-side .figure { background: rgba(158,112,15,1.00); }
+.viz-mirror .reflect-side .figure { background: rgba(23,118,112,0.60); }
+@keyframes mirrorDelay { 
+  0%, 60% { opacity: 0.25; }
+  80%, 100% { opacity: 1; }
+}
+.viz-river { width: 100%; height: 100%; position: relative; overflow: hidden; }
+.viz-river .water { position: absolute; top: 50%; left: 0px; right: 0px; height: 40px; transform: translateY(-50%); }
+.viz-river .flow-line { position: absolute; height: 1.5px; background: linear-gradient(90deg,transparent,var(--cyan),transparent); border-radius: 1px; animation: 3.5s linear 0s infinite normal none running flowRight; opacity: 0.5; }
+@keyframes flowRight { 
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+.viz-door { width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 18px; padding-bottom: 15px; }
+.viz-door .door { width: 36px; height: 65px; border-radius: 5px 5px 0px 0px; position: relative; }
+.viz-door .door.right { background: rgba(158,112,15,0.24); border: 1.5px solid rgba(158,112,15,0.72); box-shadow: rgba(158,112,15,0.24) 0px 0px 25px; }
+.viz-door .door.right::after { content: ""; position: absolute; inset: 0px; background: linear-gradient(to top, rgba(158,112,15,0.36), transparent); border-radius: 4px 4px 0px 0px; }
+.viz-door .door.wrong { background: rgba(42,34,20,0.05); border: 1px solid rgba(42,34,20,0.17); }
+.viz-door .door .knob { width: 4px; height: 4px; background: rgba(42,34,20,0.48); border-radius: 50%; position: absolute; top: 50%; right: 5px; }
+.viz-door .door.right .knob { background: var(--gold); box-shadow: 0 0 5px var(--gold); }
+.viz-eye { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.viz-eye .eye-shape { width: 75px; height: 38px; border: 2px solid rgba(158,112,15,0.72); border-radius: 50%; display: flex; align-items: center; justify-content: center; animation: 5s ease-in-out 0s infinite normal none running blink; }
+.viz-eye .pupil { width: 16px; height: 16px; background: var(--gold); border-radius: 50%; box-shadow: rgba(158,112,15,0.96) 0px 0px 12px; }
+@keyframes blink { 
+  0%, 42%, 100% { transform: scaleY(1); }
+  45% { transform: scaleY(0.1); }
+  48% { transform: scaleY(1); }
+}
+.viz-channels { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
+.viz-channels .body-outline { width: 28px; height: 75px; border: 1.5px solid rgba(42,34,20,0.19); border-radius: 14px 14px 8px 8px; position: relative; }
+.viz-channels .ch { position: absolute; width: 3px; border-radius: 2px; }
+.viz-channels .ch-up { left: 7px; bottom: 0px; height: 0px; background: linear-gradient(to top,var(--coral),var(--gold)); animation: 2.5s ease-in-out 0s infinite normal none running chUp; opacity: 0.6; }
+.viz-channels .ch-down { right: 7px; top: 0px; height: 0px; background: linear-gradient(to bottom,var(--cyan),var(--purple)); animation: 2.5s ease-in-out 0s infinite normal none running chDown; opacity: 0.6; }
+@keyframes chUp { 
+  0% { height: 0px; }
+  50% { height: 75px; }
+  100% { height: 0px; }
+}
+@keyframes chDown { 
+  0% { height: 0px; }
+  50% { height: 75px; }
+  100% { height: 0px; }
+}
+.viz-drop { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
+.viz-drop .ocean { width: 110px; height: 55px; background: linear-gradient(to top, rgba(23,118,112,0.29), transparent); border-radius: 0px 0px 55px 55px; border-width: medium 1.5px 1.5px; border-style: none solid solid; border-color: currentcolor rgba(23,118,112,0.36) rgba(23,118,112,0.36); border-image: none; position: relative; }
+.viz-drop .drop { width: 10px; height: 14px; background: rgba(23,118,112,1.00); border-radius: 50% / 60% 60% 40% 40%; position: absolute; top: -28px; left: 50%; transform: translateX(-50%); animation: 3.5s ease-in 0s infinite normal none running dropFall; }
+@keyframes dropFall { 
+  0% { top: -28px; opacity: 1; }
+  60% { top: 8px; opacity: 1; }
+  80% { top: 12px; opacity: 0; }
+  100% { top: -28px; opacity: 0; }
+}

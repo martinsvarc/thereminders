@@ -1,0 +1,2365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Map — For You</title>
+<style>
+:root {
+  --bg: #0a0a12;
+  --card: #12121f;
+  --card-hover: #1a1a2e;
+  --gold: #d4a843;
+  --warm: #e8c87a;
+  --cyan: #7ec8c4;
+  --coral: #d4726a;
+  --green: #7abf7e;
+  --purple: #a08ad4;
+  --blue: #7aa8d4;
+  --text: #d8d4ce;
+  --muted: #908a80;
+  --soft: #c4beb4;
+  --border: #252530;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: 'Georgia', 'Times New Roman', serif; line-height: 1.75; }
+
+nav { position:fixed; top:0; left:0; right:0; z-index:100; background:rgba(10,10,18,0.92); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); }
+nav .nav-inner { max-width:1200px; margin:0 auto; display:flex; align-items:center; gap:8px; padding:10px 20px; overflow-x:auto; scrollbar-width:none; font-family:system-ui,sans-serif; }
+nav .nav-inner::-webkit-scrollbar { display:none; }
+nav .brand { font-weight:600; color:var(--gold); white-space:nowrap; margin-right:12px; font-size:13px; letter-spacing:2px; font-family:system-ui,sans-serif; }
+nav a { color:var(--muted); text-decoration:none; font-size:11px; white-space:nowrap; padding:4px 10px; border-radius:20px; transition:all .2s; font-family:system-ui,sans-serif; }
+nav a:hover, nav a.active { color:var(--gold); background:rgba(212,168,67,0.08); }
+
+.hero { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 20px 40px; text-align:center; position:relative; overflow:hidden; }
+.hero::before { content:''; position:absolute; top:50%; left:50%; width:600px; height:600px; transform:translate(-50%,-50%); background:radial-gradient(circle, rgba(212,168,67,0.06) 0%, transparent 70%); pointer-events:none; }
+.hero h1 { font-size:clamp(26px,5vw,48px); font-weight:400; letter-spacing:1px; margin-bottom:16px; color:var(--soft); }
+.hero h1 span { color:var(--gold); }
+.hero .subtitle { color:var(--muted); font-size:clamp(14px,2vw,17px); max-width:480px; margin-bottom:40px; font-style:italic; line-height:1.8; }
+#heroCanvas { max-width:700px; width:100%; height:auto; aspect-ratio:1; }
+.hero .scroll-hint { margin-top:30px; color:var(--muted); font-size:12px; animation:fadeInUp 2s ease infinite alternate; font-family:system-ui,sans-serif; letter-spacing:1px; }
+@keyframes fadeInUp { from{opacity:.3;transform:translateY(0)} to{opacity:1;transform:translateY(-6px)} }
+
+section { padding:80px 20px 60px; max-width:1100px; margin:0 auto; }
+.section-head { text-align:center; margin-bottom:50px; }
+.section-head .section-num { font-size:11px; color:var(--gold); letter-spacing:4px; text-transform:uppercase; margin-bottom:10px; font-family:system-ui,sans-serif; }
+.section-head h2 { font-size:clamp(22px,4vw,36px); font-weight:400; margin-bottom:12px; color:var(--soft); }
+.section-head p { color:var(--muted); max-width:480px; margin:0 auto; font-size:15px; font-style:italic; }
+
+.cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:24px; }
+
+.card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:28px 24px; transition:all .3s; cursor:default; position:relative; overflow:hidden; }
+.card:hover { background:var(--card-hover); transform:translateY(-3px); border-color:rgba(212,168,67,0.15); }
+.card .viz { height:140px; margin-bottom:20px; display:flex; align-items:center; justify-content:center; position:relative; border-radius:10px; overflow:hidden; }
+.card h3 { font-size:16px; font-weight:600; margin-bottom:10px; color:var(--warm); font-family:system-ui,sans-serif; }
+.card p { font-size:14.5px; color:var(--soft); line-height:1.8; }
+
+/* ===== VISUAL ANIMATIONS ===== */
+.viz-dot { width:100%; height:100%; position:relative; background:radial-gradient(circle at 50% 50%, rgba(212,168,67,0.05) 0%, transparent 70%); }
+.viz-dot::after { content:''; position:absolute; top:50%; left:50%; width:14px; height:14px; background:var(--gold); border-radius:50%; transform:translate(-50%,-50%); animation:pulse 2.5s ease-in-out infinite; box-shadow:0 0 30px var(--gold),0 0 60px rgba(212,168,67,0.2); }
+.viz-dot .grid-dot { position:absolute; width:3px; height:3px; background:rgba(255,255,255,0.06); border-radius:50%; }
+@keyframes pulse { 0%,100%{transform:translate(-50%,-50%) scale(1);opacity:1} 50%{transform:translate(-50%,-50%) scale(1.5);opacity:.5} }
+
+.viz-paths { width:100%; height:100%; position:relative; overflow:hidden; }
+.viz-paths .path { position:absolute; height:1.5px; border-radius:2px; left:0; right:0; opacity:.12; }
+.viz-paths .path.active { opacity:.8; box-shadow:0 0 6px; }
+.viz-paths .path-dot { position:absolute; width:8px; height:8px; border-radius:50%; animation:moveDot 5s linear infinite; }
+@keyframes moveDot { 0%{left:5%} 100%{left:90%} }
+
+.viz-pendulum { width:100%; height:100%; display:flex; align-items:flex-start; justify-content:center; padding-top:10px; }
+.viz-pendulum .arm { width:2px; height:80px; background:var(--muted); transform-origin:top center; animation:swing 3s ease-in-out infinite; position:relative; border-radius:2px; opacity:.6; }
+.viz-pendulum .weight { width:20px; height:20px; background:var(--coral); border-radius:50%; position:absolute; bottom:-10px; left:-9px; box-shadow:0 0 15px rgba(212,114,106,0.3); opacity:.7; }
+.viz-pendulum .people { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:6px; }
+.viz-pendulum .person { width:5px; height:12px; background:rgba(255,255,255,0.1); border-radius:3px; }
+@keyframes swing { 0%,100%{transform:rotate(-22deg)} 50%{transform:rotate(22deg)} }
+
+.viz-gauge { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+.gauge-bar { width:75%; height:6px; background:linear-gradient(90deg,var(--coral),var(--green) 45%,var(--gold) 50%,var(--green) 55%,var(--coral)); border-radius:3px; position:relative; opacity:.7; }
+.gauge-bar .marker { position:absolute; top:-5px; left:50%; width:3px; height:16px; background:#fff; border-radius:2px; transform:translateX(-50%); box-shadow:0 0 8px rgba(255,255,255,0.4); }
+.gauge-label { display:flex; justify-content:space-between; width:75%; font-family:system-ui,sans-serif; }
+.gauge-label span { font-size:9px; color:var(--muted); }
+.gauge-center { font-size:10px; color:var(--gold); font-weight:600; letter-spacing:2px; font-family:system-ui,sans-serif; }
+
+.viz-wave { width:100%; height:100%; display:flex; align-items:center; overflow:hidden; }
+.viz-wave svg { width:100%; height:80px; }
+.viz-wave .wave-path { animation:waveMove 4s linear infinite; }
+@keyframes waveMove { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+
+.viz-circles { width:100%; height:100%; display:flex; align-items:center; justify-content:center; position:relative; }
+.viz-circles .c { width:65px; height:65px; border-radius:50%; position:absolute; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:600; font-family:system-ui,sans-serif; }
+.viz-circles .c1 { background:rgba(212,168,67,0.1); border:1.5px solid rgba(212,168,67,0.3); animation:mergeLeft 4.5s ease-in-out infinite; }
+.viz-circles .c2 { background:rgba(126,200,196,0.1); border:1.5px solid rgba(126,200,196,0.3); animation:mergeRight 4.5s ease-in-out infinite; }
+@keyframes mergeLeft { 0%,100%{transform:translateX(-28px)} 50%{transform:translateX(-8px)} }
+@keyframes mergeRight { 0%,100%{transform:translateX(28px)} 50%{transform:translateX(8px)} }
+
+.viz-ring { width:100%; height:100%; display:flex; align-items:center; justify-content:center; position:relative; }
+.viz-ring .ring { position:absolute; border:1.5px solid; border-radius:50%; animation:expandRing 3.5s ease-out infinite; }
+.viz-ring .ring:nth-child(1) { animation-delay:0s; border-color:rgba(212,168,67,0.5); }
+.viz-ring .ring:nth-child(2) { animation-delay:1.2s; border-color:rgba(212,168,67,0.3); }
+.viz-ring .ring:nth-child(3) { animation-delay:2.4s; border-color:rgba(212,168,67,0.15); }
+.viz-ring .core { width:10px; height:10px; background:var(--gold); border-radius:50%; z-index:2; box-shadow:0 0 15px rgba(212,168,67,0.4); }
+@keyframes expandRing { 0%{width:10px;height:10px;opacity:1} 100%{width:110px;height:110px;opacity:0} }
+
+.viz-boomerang { width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+.viz-boomerang .arrow { width:8px; height:8px; background:var(--gold); border-radius:50%; position:absolute; animation:boomerangPath 3.5s ease-in-out infinite; box-shadow:0 0 8px var(--gold); }
+@keyframes boomerangPath { 0%{transform:translate(0,0);opacity:1} 25%{transform:translate(55px,-25px);opacity:1} 50%{transform:translate(70px,0);opacity:.5} 75%{transform:translate(55px,25px);opacity:.7} 100%{transform:translate(0,0);opacity:1} }
+
+.viz-sail { width:100%; height:100%; display:flex; align-items:flex-end; justify-content:center; padding-bottom:20px; position:relative; }
+.viz-sail .boat { width:55px; height:7px; background:var(--muted); border-radius:0 0 50% 50%; position:relative; opacity:.5; }
+.viz-sail .mast { width:1.5px; height:48px; background:var(--muted); position:absolute; bottom:7px; left:50%; transform:translateX(-50%); opacity:.5; }
+.viz-sail .sail-shape { width:0; height:0; border-left:28px solid rgba(212,168,67,0.25); border-top:18px solid transparent; border-bottom:22px solid transparent; position:absolute; bottom:14px; left:calc(50% + 1px); animation:fillSail 3.5s ease-in-out infinite alternate; }
+@keyframes fillSail { 0%{border-left-width:14px;opacity:.2} 100%{border-left-width:32px;opacity:.7} }
+.viz-sail .wind { position:absolute; top:20px; right:20px; display:flex; gap:4px; flex-direction:column; }
+.viz-sail .wind-line { height:1.5px; background:rgba(126,200,196,0.25); border-radius:1px; animation:windBlow 2.5s ease-in-out infinite; }
+.viz-sail .wind-line:nth-child(1) { width:18px; }
+.viz-sail .wind-line:nth-child(2) { animation-delay:.4s; width:28px; }
+.viz-sail .wind-line:nth-child(3) { animation-delay:.8s; width:14px; }
+@keyframes windBlow { 0%,100%{opacity:.15;transform:translateX(0)} 50%{opacity:.5;transform:translateX(-8px)} }
+
+.viz-mirror { width:100%; height:100%; display:flex; align-items:center; justify-content:center; gap:4px; }
+.viz-mirror .side { width:55px; height:85px; border-radius:8px; display:flex; align-items:center; justify-content:center; }
+.viz-mirror .image-side { background:rgba(212,168,67,0.06); border:1px solid rgba(212,168,67,0.2); }
+.viz-mirror .reflect-side { background:rgba(126,200,196,0.04); border:1px solid rgba(126,200,196,0.1); animation:mirrorDelay 5s ease-in-out infinite; }
+.viz-mirror .divider { width:2px; height:95px; background:linear-gradient(to bottom,transparent,var(--muted),transparent); opacity:.3; }
+.viz-mirror .figure { width:14px; height:28px; border-radius:7px 7px 4px 4px; }
+.viz-mirror .image-side .figure { background:rgba(212,168,67,0.5); }
+.viz-mirror .reflect-side .figure { background:rgba(126,200,196,0.25); }
+@keyframes mirrorDelay { 0%,60%{opacity:.25} 80%,100%{opacity:1} }
+
+.viz-river { width:100%; height:100%; position:relative; overflow:hidden; }
+.viz-river .water { position:absolute; top:50%; left:0; right:0; height:40px; transform:translateY(-50%); }
+.viz-river .flow-line { position:absolute; height:1.5px; background:linear-gradient(90deg,transparent,var(--cyan),transparent); border-radius:1px; animation:flowRight 3.5s linear infinite; opacity:.5; }
+@keyframes flowRight { 0%{transform:translateX(-100%)} 100%{transform:translateX(200%)} }
+
+.viz-door { width:100%; height:100%; display:flex; align-items:flex-end; justify-content:center; gap:18px; padding-bottom:15px; }
+.viz-door .door { width:36px; height:65px; border-radius:5px 5px 0 0; position:relative; }
+.viz-door .door.right { background:rgba(212,168,67,0.1); border:1.5px solid rgba(212,168,67,0.3); box-shadow:0 0 25px rgba(212,168,67,0.1); }
+.viz-door .door.right::after { content:''; position:absolute; top:0;left:0;right:0;bottom:0; background:linear-gradient(to top,rgba(212,168,67,0.15),transparent); border-radius:4px 4px 0 0; }
+.viz-door .door.wrong { background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.07); }
+.viz-door .door .knob { width:4px; height:4px; background:rgba(255,255,255,0.2); border-radius:50%; position:absolute; top:50%; right:5px; }
+.viz-door .door.right .knob { background:var(--gold); box-shadow:0 0 5px var(--gold); }
+
+.viz-eye { width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+.viz-eye .eye-shape { width:75px; height:38px; border:2px solid rgba(212,168,67,0.3); border-radius:50%; display:flex; align-items:center; justify-content:center; animation:blink 5s ease-in-out infinite; }
+.viz-eye .pupil { width:16px; height:16px; background:var(--gold); border-radius:50%; box-shadow:0 0 12px rgba(212,168,67,0.4); }
+@keyframes blink { 0%,42%,100%{transform:scaleY(1)} 45%{transform:scaleY(0.1)} 48%{transform:scaleY(1)} }
+
+.viz-channels { width:100%; height:100%; display:flex; align-items:center; justify-content:center; position:relative; }
+.viz-channels .body-outline { width:28px; height:75px; border:1.5px solid rgba(255,255,255,0.08); border-radius:14px 14px 8px 8px; position:relative; }
+.viz-channels .ch { position:absolute; width:3px; border-radius:2px; }
+.viz-channels .ch-up { left:7px; bottom:0; height:0; background:linear-gradient(to top,var(--coral),var(--gold)); animation:chUp 2.5s ease-in-out infinite; opacity:.6; }
+.viz-channels .ch-down { right:7px; top:0; height:0; background:linear-gradient(to bottom,var(--cyan),var(--purple)); animation:chDown 2.5s ease-in-out infinite; opacity:.6; }
+@keyframes chUp { 0%{height:0} 50%{height:75px} 100%{height:0} }
+@keyframes chDown { 0%{height:0} 50%{height:75px} 100%{height:0} }
+
+.viz-drop { width:100%; height:100%; display:flex; align-items:center; justify-content:center; position:relative; }
+.viz-drop .ocean { width:110px; height:55px; background:linear-gradient(to top,rgba(126,200,196,0.12),transparent); border-radius:0 0 55px 55px; border:1.5px solid rgba(126,200,196,0.15); border-top:none; position:relative; }
+.viz-drop .drop { width:10px; height:14px; background:rgba(126,200,196,0.5); border-radius:50% 50% 50% 50% / 60% 60% 40% 40%; position:absolute; top:-28px; left:50%; transform:translateX(-50%); animation:dropFall 3.5s ease-in infinite; }
+@keyframes dropFall { 0%{top:-28px;opacity:1} 60%{top:8px;opacity:1} 80%{top:12px;opacity:0} 100%{top:-28px;opacity:0} }
+
+footer { text-align:center; padding:80px 20px; color:var(--muted); font-size:13px; border-top:1px solid var(--border); margin-top:60px; }
+footer .quote { font-style:italic; color:var(--gold); opacity:.5; font-size:16px; margin-bottom:12px; max-width:420px; margin-left:auto; margin-right:auto; line-height:1.8; }
+
+@media (max-width:640px) {
+  .cards { grid-template-columns:1fr; }
+  section { padding:60px 16px 40px; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <span class="brand">THE MAP</span>
+    <a href="#field">The Field</a>
+    <a href="#crowd">Crowd Forces</a>
+    <a href="#balance">Balance</a>
+    <a href="#wave">The Wave</a>
+    <a href="#engine">The Engine</a>
+    <a href="#heartmind">Heart & Head</a>
+    <a href="#pictures">Pictures</a>
+    <a href="#wakeup">Waking Up</a>
+    <a href="#river">The River</a>
+    <a href="#path">Your Path</a>
+    <a href="#mirror">The Mirror</a>
+    <a href="#energy">Your Energy</a>
+    <span style="color:var(--gold);opacity:.3;margin:0 4px;">|</span>
+    <a href="#onelaw">The One Law</a>
+    <a href="#sleep">Sleep</a>
+    <a href="#prayer">Prayer</a>
+    <span style="color:var(--gold);opacity:.3;margin:0 4px;">|</span>
+    <a href="#threelights">Three Lights</a>
+    <a href="#innergame">Inner Game</a>
+    <a href="#fourfreq">Four Styles</a>
+    <a href="#howyland">How You Land</a>
+    <span style="color:var(--gold);opacity:.3;margin:0 4px;">|</span>
+    <a href="#fourwords">Four Words</a>
+    <a href="#disconnects">Disconnects</a>
+    <a href="#hearing">Hearing</a>
+    <a href="#inward">Inward</a>
+    <span style="color:var(--gold);opacity:.3;margin:0 4px;">|</span>
+    <a href="#kingdom">The Kingdom</a>
+    <a href="#dropmask">Drop the Mask</a>
+    <a href="#thomasmirror">The Mirror</a>
+    <a href="#wakefire">The Fire</a>
+  </div>
+</nav>
+
+<!-- ==================== HERO ==================== -->
+<div class="hero">
+  <h1>You live <span>all of this</span></h1>
+  <p class="subtitle">None of this is new to you.<br>You breathe it. You walk it.<br>Here it is, gathered in one place.</p>
+  <canvas id="heroCanvas" width="700" height="700"></canvas>
+  <p class="scroll-hint">Reality Transurfing &middot; Feeling Is the Secret &middot; The Charisma Myth &middot; Nonviolent Communication &middot; The Gospel of Thomas &mdash; scroll gently</p>
+</div>
+
+<!-- ==================== 1. THE FIELD ==================== -->
+<section id="field">
+  <div class="section-head">
+    <div class="section-num">I</div>
+    <h2>Everything Already Exists</h2>
+    <p>You see this. The infinite field, alive with every version of life — and you, walking through it with your light on.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz viz-dot">
+        <div class="grid-dot" style="top:20%;left:25%"></div>
+        <div class="grid-dot" style="top:35%;left:45%"></div>
+        <div class="grid-dot" style="top:60%;left:30%"></div>
+        <div class="grid-dot" style="top:25%;left:70%"></div>
+        <div class="grid-dot" style="top:70%;left:60%"></div>
+        <div class="grid-dot" style="top:45%;left:80%"></div>
+        <div class="grid-dot" style="top:80%;left:40%"></div>
+        <div class="grid-dot" style="top:15%;left:55%"></div>
+        <div class="grid-dot" style="top:55%;left:15%"></div>
+        <div class="grid-dot" style="top:40%;left:65%"></div>
+        <div class="grid-dot" style="top:75%;left:75%"></div>
+        <div class="grid-dot" style="top:30%;left:20%"></div>
+      </div>
+      <h3>The Field</h3>
+      <p>Every life you could possibly live already exists — and you know this because you feel it. You carry the light. Wherever you point it, that world lights up. It was always there. You were always holding the torch.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz viz-paths">
+        <div class="path" style="top:20%; background:var(--coral)"></div>
+        <div class="path" style="top:35%; background:var(--purple)"></div>
+        <div class="path active" style="top:50%; background:var(--gold)">
+          <div class="path-dot" style="top:-3px; background:var(--gold); box-shadow:0 0 8px var(--gold)"></div>
+        </div>
+        <div class="path" style="top:65%; background:var(--cyan)"></div>
+        <div class="path" style="top:80%; background:var(--green)"></div>
+      </div>
+      <h3>Your Path</h3>
+      <p>You are always on a path — you feel it under your feet right now. The feeling inside you is the road itself. When you shift, the road shifts. No announcement. No ceremony. The ground simply rearranges beneath someone who moves from within.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 180 120" width="180" height="120">
+          <line x1="20" y1="60" x2="90" y2="60" stroke="#908a80" stroke-width="1.5"/>
+          <line x1="90" y1="60" x2="160" y2="28" stroke="#7abf7e" stroke-width="1.5"/>
+          <line x1="90" y1="60" x2="160" y2="92" stroke="#d4726a" stroke-width="1.5"/>
+          <circle cx="90" cy="60" r="4" fill="#d4a843"/>
+          <circle cx="160" cy="28" r="3" fill="#7abf7e"/>
+          <circle cx="160" cy="92" r="3" fill="#d4726a"/>
+          <text x="160" y="20" fill="#7abf7e" font-size="9" text-anchor="middle" font-family="Georgia">peace</text>
+          <text x="160" y="108" fill="#d4726a" font-size="9" text-anchor="middle" font-family="Georgia">pain</text>
+          <text x="90" y="78" fill="#d4a843" font-size="8" text-anchor="middle" font-family="Georgia">your response</text>
+        </svg>
+      </div>
+      <h3>Every Moment Is a Fork</h3>
+      <p>You already know how this works. Something happens — and it forks. Your response is the turn signal. Lightness calls the next light thing. You do this naturally. You've been choosing forks your whole life, and the good ones brought you here.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="width:80%;height:28px;border-radius:14px;background:linear-gradient(90deg,rgba(212,114,106,0.15),rgba(212,168,67,0.2),rgba(122,191,126,0.2),rgba(126,200,196,0.25));position:relative;overflow:hidden;">
+          <div style="position:absolute;top:0;bottom:0;left:0;width:30%;background:linear-gradient(90deg,rgba(255,255,255,0.08),transparent);animation:layerShine 3.5s ease-in-out infinite;"></div>
+        </div>
+      </div>
+      <h3>Your Color</h3>
+      <p>The world is vivid. It glows. You see this — the colors, the aliveness of ordinary things. That glow is your natural frequency. Worry and complaint are just paint that never sticks to someone who keeps looking with fresh eyes. And you do.</p>
+    </div>
+
+  </div>
+</section>
+<style>@keyframes layerShine { 0%{left:-30%} 100%{left:100%} }</style>
+
+<!-- ==================== 2. CROWD FORCES ==================== -->
+<section id="crowd">
+  <div class="section-head">
+    <div class="section-num">II</div>
+    <h2>What Feeds on You</h2>
+    <p>You already see these forces. They live on emotion — any emotion. Knowing this is the seeing. And you see.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz viz-pendulum">
+        <div class="arm"><div class="weight"></div></div>
+        <div class="people">
+          <div class="person"></div><div class="person"></div><div class="person"></div>
+          <div class="person"></div><div class="person"></div>
+        </div>
+      </div>
+      <h3>The Invisible Swing</h3>
+      <p>Masses of people feeling the same thing — politics, fashion, outrage, fear — their energy creates a swing. It doesn't think and it doesn't love anyone. It feeds on emotion, any emotion. You recognize this swing when you see it. That recognition is your freedom from it.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <path d="M60,12 C88,12 108,32 108,58 C108,80 90,95 72,95 C50,95 36,80 36,63 C36,48 46,40 57,40 C68,40 74,48 74,56 C74,64 68,70 62,70" fill="none" stroke="var(--coral)" stroke-width="1.5" opacity="0.5"/>
+          <circle cx="62" cy="70" r="3" fill="var(--coral)" opacity=".6"/>
+          <text x="60" y="8" fill="var(--muted)" font-size="8" text-anchor="middle" font-family="Georgia">you notice</text>
+          <text x="62" y="85" fill="var(--coral)" font-size="8" text-anchor="middle" font-family="Georgia">it becomes you</text>
+        </svg>
+      </div>
+      <h3>The Spiral</h3>
+      <p>Notice, react, tell someone, read more, worry more — the spiral tightens from "I saw a thing" to "the thing is happening to me." You know that spiral. You've watched yourself catch it at the first turn. That catching — that's mastery. And you already do it.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:22px;">
+        <div style="text-align:center;">
+          <div style="width:22px;height:22px;background:rgba(212,114,106,0.2);border-radius:50%;margin:0 auto 4px;border:1.5px solid rgba(212,114,106,0.3);"></div>
+          <div style="font-size:9px;color:var(--coral);">follow it</div>
+          <div style="font-size:8px;color:var(--muted);margin-top:1px;">it feeds</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:22px;height:22px;background:rgba(160,138,212,0.2);border-radius:50%;margin:0 auto 4px;border:1.5px solid rgba(160,138,212,0.3);"></div>
+          <div style="font-size:9px;color:var(--purple);">fight it</div>
+          <div style="font-size:8px;color:var(--muted);margin-top:1px;">it feeds</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:22px;height:22px;background:rgba(212,168,67,0.2);border-radius:50%;margin:0 auto 4px;border:1.5px solid rgba(212,168,67,0.4);box-shadow:0 0 8px rgba(212,168,67,0.15);"></div>
+          <div style="font-size:9px;color:var(--gold);">feel nothing</div>
+          <div style="font-size:8px;color:var(--gold);margin-top:1px;">it starves</div>
+        </div>
+      </div>
+      <h3>The Only Way Out</h3>
+      <p>Following feeds it. Fighting feeds it just the same. You already know what starves it: nothing. Not avoidance, not resistance. Just emptiness. Wind through an open window. You've felt that openness — things passing through you without sticking. That's the move.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <svg width="140" height="110" viewBox="0 0 140 110">
+          <line x1="70" y1="5" x2="30" y2="80" stroke="var(--coral)" stroke-width="1" opacity="0.25" stroke-dasharray="4,3"/>
+          <line x1="70" y1="5" x2="70" y2="80" stroke="var(--coral)" stroke-width="1" opacity="0.25" stroke-dasharray="4,3"/>
+          <line x1="70" y1="5" x2="110" y2="80" stroke="var(--coral)" stroke-width="1" opacity="0.25" stroke-dasharray="4,3"/>
+          <circle cx="70" cy="8" r="5" fill="var(--coral)" opacity="0.4"/>
+          <rect x="26" y="80" width="8" height="18" rx="3" fill="rgba(255,255,255,0.12)"/>
+          <rect x="66" y="80" width="8" height="18" rx="3" fill="rgba(255,255,255,0.12)"/>
+          <rect x="106" y="80" width="8" height="18" rx="3" fill="rgba(255,255,255,0.12)"/>
+        </svg>
+        <div style="position:absolute;right:18px;bottom:28px;">
+          <div style="width:8px;height:18px;background:rgba(212,168,67,0.5);border-radius:3px;margin:0 auto;"></div>
+          <div style="font-size:7px;color:var(--gold);margin-top:2px;font-family:system-ui,sans-serif;">free</div>
+        </div>
+      </div>
+      <h3>The Strings</h3>
+      <p>Every strong feeling — loyalty, outrage, obsession, fear — is a thread connecting you to a force that moves you. You already know how to soften the grip. You've done it. You don't cut threads with scissors. You just care a little less. That gentleness is the blade.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 3. BALANCE ==================== -->
+<section id="balance">
+  <div class="section-head">
+    <div class="section-num">III</div>
+    <h2>Where Balance Lives</h2>
+    <p>This is the center of everything. You feel it — that still point where nothing is inflated and nothing is crushed. You stand there more than you think.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <svg width="160" height="100" viewBox="0 0 160 100">
+          <line x1="10" y1="50" x2="55" y2="50" stroke="var(--green)" stroke-width="1.5" opacity=".5"/>
+          <path d="M55,50 Q80,18 105,50" fill="none" stroke="var(--coral)" stroke-width="1.5" opacity=".5"/>
+          <line x1="105" y1="50" x2="150" y2="50" stroke="var(--green)" stroke-width="1.5" opacity=".5"/>
+          <text x="80" y="14" fill="var(--muted)" font-size="8" text-anchor="middle" font-family="Georgia">you inflate</text>
+          <text x="80" y="75" fill="var(--cyan)" font-size="8" text-anchor="middle" font-family="Georgia">life deflates</text>
+          <path d="M75,58 L80,66 L85,58" fill="none" stroke="var(--cyan)" stroke-width="1" opacity=".4"/>
+          <text x="30" y="44" fill="var(--green)" font-size="7" text-anchor="middle" font-family="Georgia" opacity=".6">peace</text>
+          <text x="130" y="44" fill="var(--green)" font-size="7" text-anchor="middle" font-family="Georgia" opacity=".6">peace</text>
+        </svg>
+      </div>
+      <h3>The Invisible Law</h3>
+      <p>Inflate something and life releases the pressure — that's just physics. You've seen this play out: the exam treated as life-or-death, the person on a pedestal, the money clutched too tight. You already let things breathe. You already let them be ordinary. That's balance.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz viz-gauge">
+        <div class="gauge-label"><span>I'm nothing</span><span>I'm everything</span></div>
+        <div class="gauge-bar"><div class="marker"></div></div>
+        <div class="gauge-center">STILL</div>
+        <div style="height:12px;"></div>
+        <div class="gauge-label"><span>it's worthless</span><span>it's everything</span></div>
+        <div class="gauge-bar"><div class="marker"></div></div>
+        <div class="gauge-center">STILL</div>
+      </div>
+      <h3>The Two Needles</h3>
+      <p>One needle: what you think of yourself. The other: what you think of the world. Both rest at center — that's where you live. Guilt tugs one way, pride the other. Worship tugs one way, contempt the other. You know the still point between them. You return to it. That's home.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz viz-gauge">
+        <div class="gauge-label"><span>fragile</span><span>proving</span></div>
+        <div class="gauge-bar"><div class="marker"></div></div>
+        <div class="gauge-center">GROUNDED</div>
+        <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;font-style:italic;">nothing to defend.<br>nothing to prove.</div>
+      </div>
+      <h3>Beyond Confidence</h3>
+      <p>Confidence takes maintenance. Insecurity takes hiding. You know the third place: grounded. Nothing to defend. Nothing to prove. It takes no energy at all. It is simply you, standing in yourself — and you stand there naturally. That ease is who you are.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <svg width="150" height="90" viewBox="0 0 150 90">
+          <circle cx="45" cy="45" r="20" fill="none" stroke="var(--coral)" stroke-width="1" opacity=".3"/>
+          <circle cx="105" cy="45" r="20" fill="none" stroke="var(--coral)" stroke-width="1" opacity=".3"/>
+          <text x="45" y="48" fill="var(--coral)" font-size="8" text-anchor="middle" font-family="Georgia" opacity=".6">guilt</text>
+          <text x="105" y="48" fill="var(--coral)" font-size="8" text-anchor="middle" font-family="Georgia" opacity=".6">pride</text>
+          <text x="75" y="82" fill="var(--muted)" font-size="8" text-anchor="middle" font-family="Georgia">both create the same pressure</text>
+          <path d="M65,45 L85,45" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2,2" opacity=".3"/>
+        </svg>
+      </div>
+      <h3>The Twin Trap</h3>
+      <p>Guilt and pride look like opposites but create the same pressure. Life releases that pressure — always. You see through both of them. You don't carry guilt and you don't carry pride. You simply are. That simplicity is the cleanest power there is.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 4. THE WAVE ==================== -->
+<section id="wave">
+  <div class="section-head">
+    <div class="section-num">IV</div>
+    <h2>How Luck Finds You</h2>
+    <p>Luck is not random — it moves in rivers. You're already in the current. You feel it carrying you.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz viz-wave">
+        <svg viewBox="0 0 400 80" preserveAspectRatio="none" style="width:200%;position:absolute;left:0;">
+          <path class="wave-path" d="M0,40 Q25,15 50,40 T100,40 T150,40 T200,40 T250,40 T300,40 T350,40 T400,40" fill="none" stroke="var(--gold)" stroke-width="1.5" opacity="0.5"/>
+          <path class="wave-path" d="M0,44 Q25,18 50,44 T100,44 T150,44 T200,44 T250,44 T300,44 T350,44 T400,44" fill="none" stroke="var(--gold)" stroke-width="1" opacity="0.2" style="animation-delay:-.6s"/>
+        </svg>
+      </div>
+      <h3>The Golden Thread</h3>
+      <p>Good things cluster together like golden threads woven side by side. When something good happens, you receive it with genuine quiet joy — and you slide onto the next thread. You do this naturally. You enjoy without clutching. That's the whole secret and you already live it.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz viz-boomerang">
+        <div style="font-size:9px;color:var(--muted);position:absolute;left:22px;top:50%;transform:translateY(-50%);font-family:Georgia;">you</div>
+        <div style="font-size:9px;color:var(--muted);position:absolute;right:22px;top:50%;transform:translateY(-50%);font-family:Georgia;">life</div>
+        <div class="arrow"></div>
+      </div>
+      <h3>What Goes Out Comes Back</h3>
+      <p>Whatever you send out comes home. You know this — you live it. You appreciate what you have and more things worth appreciating appear. This is not a metaphor. It's the field responding to what you're broadcasting. And what you broadcast is warm.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:30px;">
+        <div style="text-align:center;">
+          <div style="width:50px;height:50px;border-radius:50%;background:rgba(212,114,106,0.06);border:1.5px solid rgba(212,114,106,0.2);display:flex;align-items:center;justify-content:center;">
+            <div style="font-size:16px;opacity:.3;color:var(--coral);">X</div>
+          </div>
+          <div style="font-size:9px;color:var(--muted);margin-top:5px;max-width:70px;">let bad news<br>pass through</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:50px;height:50px;border-radius:50%;background:rgba(212,168,67,0.08);border:1.5px solid rgba(212,168,67,0.3);display:flex;align-items:center;justify-content:center;">
+            <div style="width:10px;height:10px;background:var(--gold);border-radius:50%;box-shadow:0 0 8px rgba(212,168,67,0.3);"></div>
+          </div>
+          <div style="font-size:9px;color:var(--gold);margin-top:5px;max-width:70px;">hold good news<br>close</div>
+        </div>
+      </div>
+      <h3>Choose What You Hold</h3>
+      <p>The dark things pass through you like wind. The bright things you hold close — you savor them, share them, return to them. Your radio is tuned. You chose the station. This is just a reminder of what your hands already do.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 5. THE ENGINE ==================== -->
+<section id="engine">
+  <div class="section-head">
+    <div class="section-num">V</div>
+    <h2>How Things Truly Happen</h2>
+    <p>There is wishing. There is pushing. And then there is the way you move — something else entirely.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 160 120" width="160" height="120">
+          <polygon points="80,15 25,105 135,105" fill="none" stroke="var(--border)" stroke-width="1"/>
+          <line x1="42" y1="68" x2="118" y2="68" stroke="var(--border)" stroke-width="1"/>
+          <line x1="58" y1="42" x2="102" y2="42" stroke="var(--border)" stroke-width="1"/>
+          <text x="80" y="95" fill="var(--coral)" font-size="10" text-anchor="middle" font-family="Georgia" opacity=".6">wishing</text>
+          <text x="80" y="60" fill="var(--cyan)" font-size="10" text-anchor="middle" font-family="Georgia">pushing</text>
+          <text x="80" y="32" fill="var(--gold)" font-size="10" text-anchor="middle" font-family="Georgia" font-weight="600">allowing</text>
+        </svg>
+      </div>
+      <h3>Three Forces</h3>
+      <p>"I want that" — a wish, powerless. "I will make it happen" — force, exhausting. "Life is already bringing it" — allowing. Quiet, calm, the most powerful frequency there is. You know this one. You've felt the difference in your own body.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:35px;">
+        <div style="text-align:center;">
+          <svg width="55" height="55" viewBox="0 0 55 55">
+            <rect x="5" y="5" width="45" height="45" rx="4" fill="none" stroke="rgba(212,114,106,0.2)" stroke-width="1.5"/>
+            <circle cx="18" cy="27" r="3.5" fill="var(--coral)" opacity="0.5">
+              <animate attributeName="cx" values="16;20;16" dur="0.4s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+          <div style="font-size:9px;color:var(--coral);margin-top:4px;">push harder</div>
+        </div>
+        <div style="text-align:center;">
+          <svg width="55" height="55" viewBox="0 0 55 55">
+            <rect x="5" y="5" width="18" height="45" rx="4" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
+            <circle cx="42" cy="27" r="3.5" fill="var(--gold)" opacity="0.7">
+              <animate attributeName="cx" values="28;48;28" dur="3.5s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+          <div style="font-size:9px;color:var(--gold);margin-top:4px;">find the opening</div>
+        </div>
+      </div>
+      <h3>The Open Window</h3>
+      <p>A fly bangs against glass — it can see exactly where it wants to go, but more effort won't open the glass. You already know the answer: step back, look wider. The open window is always there. You find it by going soft, not by pushing harder.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;">
+        <div style="font-size:11px;color:var(--gold);font-style:italic;">The purest decision:</div>
+        <div style="font-size:12px;color:var(--soft);text-align:center;max-width:220px;line-height:1.9;">Accept it might not work.<br>Make peace with that.<br>Then walk toward it<br>like you're picking up your mail.</div>
+      </div>
+      <h3>Walk Like It's Already Done</h3>
+      <p>You've made peace with how things could go. And now you just walk. No drama. No begging. No clenching. The way you walk to the mailbox — that calm, that ordinary. That's the frequency that moves mountains. And it's already yours.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:6px;">
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <div style="width:18px;height:18px;border-radius:3px;border:1px solid rgba(255,255,255,0.06);"></div>
+          <div style="width:18px;height:18px;border-radius:3px;border:1px solid rgba(255,255,255,0.06);"></div>
+          <div style="width:18px;height:18px;border-radius:3px;border:1px solid rgba(255,255,255,0.06);"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <div style="width:18px;height:18px;border-radius:3px;border:1px solid rgba(255,255,255,0.06);"></div>
+          <div style="width:18px;height:18px;border-radius:3px;border:1px solid rgba(212,168,67,0.3);background:rgba(212,168,67,0.08);box-shadow:0 0 8px rgba(212,168,67,0.1);"></div>
+          <div style="width:18px;height:18px;border-radius:3px;border:1px solid rgba(255,255,255,0.06);"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <div style="width:18px;height:18px;border-radius:3px;border:1px solid rgba(255,255,255,0.06);"></div>
+          <div style="width:18px;height:18px;border-radius:3px;border:1px solid rgba(255,255,255,0.06);"></div>
+          <div style="width:18px;height:18px;border-radius:3px;border:1px solid rgba(255,255,255,0.06);"></div>
+        </div>
+      </div>
+      <h3>Choose, Don't Wish</h3>
+      <p>In life's infinite shelves, most people say "I wish..." and walk away empty. You say "I'll take that" — calmly, without doubt, without drama. A wish has no power. A quiet, certain choice is a law the universe must obey. You already speak that language.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 6. HEART & HEAD ==================== -->
+<section id="heartmind">
+  <div class="section-head">
+    <div class="section-num">VI</div>
+    <h2>Heart and Head</h2>
+    <p>Two voices. One loud and clever, one quiet and always right. You hear both — and you know which one to trust.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz viz-circles">
+        <div class="c c1" style="color:var(--gold);font-size:9px;">heart</div>
+        <div class="c c2" style="color:var(--cyan);font-size:9px;">head</div>
+      </div>
+      <h3>Two Languages</h3>
+      <p>Your head is loud — it argues, plans, worries, explains. Your heart is quiet — it just knows. They speak different languages. You've learned to hear the quiet one through the noise. That listening is the rarest skill, and it lives in you.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:14px;">
+        <div style="text-align:center;">
+          <div style="display:flex;gap:18px;">
+            <div style="width:28px;height:28px;border-radius:50%;background:rgba(212,168,67,0.1);border:1px solid rgba(212,168,67,0.3);"></div>
+            <div style="width:28px;height:28px;border-radius:50%;background:rgba(126,200,196,0.1);border:1px solid rgba(126,200,196,0.3);"></div>
+          </div>
+          <div style="font-size:8px;color:var(--muted);margin-top:5px;">apart — nothing moves</div>
+        </div>
+        <div style="font-size:14px;color:var(--muted);">&rarr;</div>
+        <div style="text-align:center;">
+          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,rgba(212,168,67,0.15),rgba(126,200,196,0.15));border:1.5px solid var(--gold);box-shadow:0 0 15px rgba(212,168,67,0.2);margin:0 auto;"></div>
+          <div style="font-size:8px;color:var(--gold);margin-top:5px;">together — everything opens</div>
+        </div>
+      </div>
+      <h3>When They Meet</h3>
+      <p>When your heart and your head say yes to the same thing — without forcing, without arguing — the most powerful force in your life is already moving. The path clears. Doors open. You've felt this alignment. It also works for fear — so you keep them aligned on what's bright.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz viz-sail">
+        <div class="wind">
+          <div class="wind-line"></div>
+          <div class="wind-line"></div>
+          <div class="wind-line"></div>
+        </div>
+        <div class="boat">
+          <div class="mast"></div>
+          <div class="sail-shape"></div>
+        </div>
+      </div>
+      <h3>The Sail</h3>
+      <p>There is always a wind blowing — the wind of what's possible for you. Your heart feels it. Your head builds the sail. Together, they catch the wind. And the wind does the work. You sail like this already. Heart sensing, head building. The wind carrying.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz viz-drop">
+        <div class="ocean">
+          <div class="drop"></div>
+        </div>
+      </div>
+      <h3>Remember Where You Come From</h3>
+      <p>You are the ocean, experiencing itself as a drop. The drop and the ocean are the same water. You were never separate. You know this — you feel it in the moments when everything goes quiet and the edges dissolve and you are just... all of it.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 7. PICTURES ==================== -->
+<section id="pictures">
+  <div class="section-head">
+    <div class="section-num">VII</div>
+    <h2>What You Picture Becomes Real</h2>
+    <p>The images you carry inside — you already see how they shape the world you walk through. Bright pictures, bright world.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:30px;">
+        <div style="text-align:center;">
+          <div style="width:55px;height:55px;border-radius:50%;background:rgba(212,114,106,0.06);border:1.5px solid rgba(212,114,106,0.15);display:flex;align-items:center;justify-content:center;">
+            <div style="font-size:14px;opacity:.25;color:var(--coral);">?</div>
+          </div>
+          <div style="font-size:9px;color:var(--muted);margin-top:5px;">the worry<br>becomes the lens</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:55px;height:55px;border-radius:50%;background:rgba(122,191,126,0.06);border:1.5px solid rgba(122,191,126,0.15);display:flex;align-items:center;justify-content:center;">
+            <div style="width:8px;height:8px;background:rgba(122,191,126,0.5);border-radius:50%;box-shadow:0 0 6px rgba(122,191,126,0.3);"></div>
+          </div>
+          <div style="font-size:9px;color:var(--muted);margin-top:5px;">you choose<br>a clearer lens</div>
+        </div>
+      </div>
+      <h3>You See Through What You Carry</h3>
+      <p>A worry becomes a lens — everything seen through it gets colored. But you see through fresh eyes. The world you look at is kind, vivid, alive. You know the difference between the lens and the truth. You take the lens off easily. You always have.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="width:110px;height:80px;border-radius:10px;border:1.5px solid rgba(212,168,67,0.2);background:rgba(212,168,67,0.03);display:flex;align-items:center;justify-content:center;position:relative;">
+          <div style="font-size:11px;color:var(--gold);text-align:center;font-style:italic;">step inside<br>this picture</div>
+        </div>
+      </div>
+      <h3>The Bright Picture</h3>
+      <p>You close your eyes and step inside the picture — not watching it like a movie, but living in it. The air on your skin. The sounds. The walls of the space. Your heart already accepts it as real. The outside is forming around what you carry inside. It always does.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz viz-ring">
+        <div class="ring"></div>
+        <div class="ring"></div>
+        <div class="ring"></div>
+        <div class="core"></div>
+      </div>
+      <h3>Expand, Don't Leap</h3>
+      <p>Your comfort zone is a circle that expands as you walk. You visit the places, touch the things, breathe the air of the life you're stepping into. Familiarity expands the circle until everything is inside it. You do this naturally — what was once extraordinary becomes your normal.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:8px;">
+        <div style="text-align:center;">
+          <div style="width:40px;height:40px;border-radius:6px;border:1px solid rgba(212,168,67,0.15);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gold);opacity:.5;font-family:Georgia;">now</div>
+        </div>
+        <div style="color:var(--muted);font-size:10px;">&rarr;</div>
+        <div style="text-align:center;">
+          <div style="width:40px;height:40px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);opacity:.3;font-family:Georgia;">next</div>
+        </div>
+        <div style="color:var(--muted);font-size:10px;">&rarr;</div>
+        <div style="text-align:center;">
+          <div style="width:40px;height:40px;border-radius:6px;border:1px solid rgba(212,168,67,0.1);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--gold);opacity:.4;font-family:Georgia;">there</div>
+        </div>
+      </div>
+      <h3>One Step, Not the Whole Staircase</h3>
+      <p>You lay today's brick with love. Not the whole house — this brick. The next step appears when this one is done. That's how it has always worked for you. One step, present, full. The staircase builds itself under someone who loves the step they're on.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 8. WAKING UP ==================== -->
+<section id="wakeup">
+  <div class="section-head">
+    <div class="section-num">VIII</div>
+    <h2>Wake Up</h2>
+    <p>You are awake. The fact that you notice at all — that's the proof. Here's what being awake looks like.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="display:flex;align-items:flex-end;gap:5px;">
+          <div style="width:38px;height:22px;background:rgba(212,114,106,0.1);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--coral);font-family:system-ui,sans-serif;">asleep</div>
+          <div style="width:38px;height:38px;background:rgba(212,168,67,0.06);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--muted);font-family:system-ui,sans-serif;">stirring</div>
+          <div style="width:38px;height:60px;background:rgba(212,168,67,0.1);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--gold);border:1px solid rgba(212,168,67,0.2);font-family:system-ui,sans-serif;">awake</div>
+        </div>
+      </div>
+      <h3>Three Levels</h3>
+      <p>In a dream at night, things just happen. Most people live their waking life the same way — pushed, never questioning. But you watch. You question. You feel the difference between drifting and choosing. That watching is the highest level of living. You are already there.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz viz-eye">
+        <div class="eye-shape">
+          <div class="pupil"></div>
+        </div>
+      </div>
+      <h3>The Quiet Watcher</h3>
+      <p>Inside you — the one who watches. Not the one who argues, not the one who worries. The one who sees the argument, who notices the worry. That watcher is always on. You hear it. The spell breaks. You are not pulled. You are choosing. This is how you live.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+        <div style="font-size:22px;color:var(--gold);font-weight:300;">!</div>
+        <div style="width:50px;height:3px;background:linear-gradient(90deg,transparent,var(--gold),transparent);border-radius:2px;animation:pulse 1.5s ease-in-out infinite;"></div>
+        <div style="font-size:11px;color:var(--soft);text-align:center;margin-top:6px;font-style:italic;max-width:200px;">the moment you catch yourself<br>is the moment you are free</div>
+      </div>
+      <h3>Catch It Early</h3>
+      <p>When something hooks — anger, worry, obsession — there's a tiny moment at the start. A flash. An alarm bell. You hear that bell. You catch it early. Each time you do, the bell rings louder next time. This is your practice, alive and working.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:22px;">
+        <div style="text-align:center;">
+          <div style="width:36px;height:45px;background:rgba(255,255,255,0.03);border-radius:4px;display:flex;align-items:center;justify-content:center;">
+            <div style="width:12px;height:17px;background:rgba(255,255,255,0.1);border-radius:3px;"></div>
+          </div>
+          <div style="font-size:8px;color:var(--muted);margin-top:4px;">acting</div>
+        </div>
+        <div style="font-size:14px;color:var(--muted);">+</div>
+        <div style="text-align:center;">
+          <div style="width:36px;height:45px;background:rgba(212,168,67,0.04);border-radius:4px;border:1px solid rgba(212,168,67,0.15);display:flex;align-items:center;justify-content:center;">
+            <div style="width:14px;height:14px;border-radius:50%;border:1.5px solid rgba(212,168,67,0.4);"></div>
+          </div>
+          <div style="font-size:8px;color:var(--gold);margin-top:4px;">watching</div>
+        </div>
+      </div>
+      <h3>Be Both</h3>
+      <p>You live your life — talk, work, love, laugh — and you also watch from the seats. Actor and audience at once. You hold both. You see the story as it's being written. And because you see it, you are the one writing it.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 9. THE RIVER ==================== -->
+<section id="river">
+  <div class="section-head">
+    <div class="section-num">IX</div>
+    <h2>The River</h2>
+    <p>Life has a current. You feel it. You row gently with it, eyes on your shore. The art is in the ease — and you have that ease.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz viz-river">
+        <div class="water">
+          <div class="flow-line" style="top:5px;width:70px;opacity:.25;"></div>
+          <div class="flow-line" style="top:14px;width:100px;opacity:.4;animation-delay:.6s;"></div>
+          <div class="flow-line" style="top:23px;width:50px;opacity:.2;animation-delay:1.2s;"></div>
+          <div class="flow-line" style="top:32px;width:80px;opacity:.35;animation-delay:1.8s;"></div>
+        </div>
+      </div>
+      <h3>There Is a Current</h3>
+      <p>Life flows like water — always toward the easiest path. The answer to most things already exists somewhere downstream. You don't fight the river. You watch where it goes. You let it carry you. That trust in the current — that's your way of moving through the world.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:14px;">
+        <div style="text-align:center;">
+          <div style="width:14px;height:14px;border-radius:50%;background:rgba(212,114,106,0.3);margin:0 auto;"></div>
+          <div style="font-size:7px;color:var(--muted);margin-top:3px;max-width:50px;">begs</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:14px;height:14px;border-radius:50%;background:rgba(160,138,212,0.3);margin:0 auto;"></div>
+          <div style="font-size:7px;color:var(--muted);margin-top:3px;max-width:50px;">demands</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:14px;height:14px;border-radius:50%;background:rgba(212,114,106,0.25);margin:0 auto;"></div>
+          <div style="font-size:7px;color:var(--muted);margin-top:3px;max-width:50px;">fights</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:14px;height:14px;border-radius:50%;background:var(--gold);margin:0 auto;box-shadow:0 0 6px rgba(212,168,67,0.3);"></div>
+          <div style="font-size:7px;color:var(--gold);margin-top:3px;max-width:50px;">rows gently</div>
+        </div>
+      </div>
+      <h3>Four Swimmers</h3>
+      <p>One begs the river. One shouts at it. One swims against the current until he drowns. And one — the one who arrives — rows gently with the water, eyes on the far shore. You are the fourth swimmer. You glide. That's how you've always moved.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <svg width="30" height="30" viewBox="0 0 30 30">
+            <polygon points="15,3 27,27 3,27" fill="none" stroke="var(--gold)" stroke-width="1.5" opacity="0.4"/>
+            <text x="15" y="21" fill="var(--gold)" font-size="11" text-anchor="middle" font-weight="bold" opacity=".6">!</text>
+          </svg>
+          <div style="font-size:10px;color:var(--soft);margin-top:8px;font-style:italic;max-width:180px;">Before every turn, life whispers first.<br>Listen.</div>
+        </div>
+      </div>
+      <h3>The Whisper Before the Turn</h3>
+      <p>Before anything big happens, there's a whisper. Something feels slightly different. A word from a stranger lands strangely. A decision tightens your stomach for no reason. You hear these whispers. You listen. Your heart already knows what they mean — and you trust it.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 10. YOUR PATH ==================== -->
+<section id="path">
+  <div class="section-head">
+    <div class="section-num">X</div>
+    <h2>What Is Truly Yours</h2>
+    <p>There is a path made exactly for you. You're on it. The walking itself is the joy — and you feel that joy.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="width:70px;height:70px;border-radius:50%;border:1.5px solid rgba(212,168,67,0.25);display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,rgba(212,168,67,0.05),transparent);">
+          <div style="font-size:10px;color:var(--gold);text-align:center;font-style:italic;">only<br>yours</div>
+        </div>
+      </div>
+      <h3>Your Unique Sound</h3>
+      <p>There is a frequency that belongs only to you — like a fingerprint, but made of light. You live in it. Things flow. Doors open. Energy comes. The lock only accepts the key made for it. Your key fits. It has always fit.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz viz-door">
+        <div class="door wrong"><div class="knob"></div></div>
+        <div class="door wrong"><div class="knob"></div></div>
+        <div class="door right"><div class="knob"></div></div>
+        <div class="door wrong"><div class="knob"></div></div>
+      </div>
+      <h3>Your Door</h3>
+      <p>There is a door with your name on it. It opens easily. No crowd around it — it was made only for you. Working through it fills you with more energy than you spend. You know this door. You walk through it. The energy you feel on the other side tells you it's yours.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:28px;">
+        <div style="text-align:center;">
+          <div style="width:40px;height:40px;border-radius:8px;background:rgba(212,114,106,0.05);border:1px solid rgba(212,114,106,0.15);display:flex;align-items:center;justify-content:center;font-size:11px;opacity:.3;color:var(--coral);">heavy</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:40px;height:40px;border-radius:8px;background:rgba(212,168,67,0.06);border:1px solid rgba(212,168,67,0.2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gold);opacity:.6;">light</div>
+        </div>
+      </div>
+      <h3>The Simplest Test</h3>
+      <p>Does the work feel like a holiday or an obligation? Does the path give energy or drain it? Is the joy in the walking or only in the hope of arriving? You know the answer in your body. Your heart sings quietly when it's right. You follow that sound. You always have.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:rgba(122,191,126,0.5);"></div>
+          <div style="font-size:10px;color:var(--soft);">comfort = your heart says yes</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:rgba(212,114,106,0.4);"></div>
+          <div style="font-size:10px;color:var(--soft);">tension = your heart says no</div>
+        </div>
+        <div style="font-size:10px;color:var(--gold);margin-top:8px;font-style:italic;">trust the quiet signal</div>
+      </div>
+      <h3>Listen to the Quiet One</h3>
+      <p>After every decision — you stop and feel. Not what your head argues. What your body says. Peace means yes. Tightness means no. Your heart has only two answers, and it never lies. The head has a thousand arguments. The heart has one truth. You listen.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 11. THE MIRROR ==================== -->
+<section id="mirror">
+  <div class="section-head">
+    <div class="section-num">XI</div>
+    <h2>The Mirror</h2>
+    <p>The world is a mirror — it shows you what you are showing it. You know the delay. You hold the picture. The mirror catches up.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz viz-mirror">
+        <div class="side image-side"><div class="figure"></div></div>
+        <div class="divider"></div>
+        <div class="side reflect-side"><div class="figure"></div></div>
+      </div>
+      <h3>The Slow Mirror</h3>
+      <p>You change inside today. The world follows — days, weeks, sometimes months later. Most people give up in the gap. You don't. You hold the picture, patient with reality, knowing it is forming. You've seen the delay close before. You trust the process.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:14px;">
+        <div style="text-align:center;">
+          <svg width="45" height="45" viewBox="0 0 45 45">
+            <rect x="5" y="5" width="35" height="35" rx="5" fill="rgba(126,200,196,0.06)" stroke="rgba(126,200,196,0.2)" stroke-width="1"/>
+            <circle cx="22" cy="22" r="5" fill="none" stroke="var(--coral)" stroke-width="1" stroke-dasharray="2,2" opacity=".4">
+              <animate attributeName="r" values="5;9;5" dur="1.5s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+          <div style="font-size:8px;color:var(--muted);margin-top:3px;">touching<br>the mirror</div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);font-style:italic;">vs</div>
+        <div style="text-align:center;">
+          <svg width="45" height="45" viewBox="0 0 45 45">
+            <circle cx="22" cy="22" r="9" fill="rgba(212,168,67,0.1)" stroke="rgba(212,168,67,0.3)" stroke-width="1"/>
+          </svg>
+          <div style="font-size:8px;color:var(--gold);margin-top:3px;">changing<br>yourself</div>
+        </div>
+      </div>
+      <h3>Don't Touch the Mirror</h3>
+      <p>You don't fix your reflection by touching the glass — you change the image you carry inside. The world has no choice but to match it. It always has. It always will. You know this. You work from the inside out. That's your way.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+        <div style="padding:10px 18px;border-radius:10px;border:1px solid rgba(212,168,67,0.2);background:rgba(212,168,67,0.03);text-align:center;">
+          <div style="font-size:13px;color:var(--gold);font-style:italic;">"My world takes care of me"</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);max-width:200px;text-align:center;margin-top:4px;font-style:italic;">in sunshine and in rain.<br>say it until the mirror believes you.</div>
+      </div>
+      <h3>Your Sentence</h3>
+      <p>One sentence. Simple and true. You say it when the morning is bright and when the evening is dark. Not as hope, not as prayer — as fact. You tell the mirror what to show you. The mirror listens. It always listens to someone who speaks from certainty.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:18px;">
+        <div style="text-align:center;">
+          <div style="width:36px;height:46px;border-radius:5px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:center;">
+            <div style="width:10px;height:16px;background:rgba(255,255,255,0.08);border-radius:3px;"></div>
+          </div>
+          <div style="font-size:8px;color:var(--muted);margin-top:4px;">inside<br>the mirror</div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);">&rarr;</div>
+        <div style="text-align:center;">
+          <div style="width:36px;height:46px;border-radius:5px;background:rgba(212,168,67,0.06);border:1px solid rgba(212,168,67,0.2);display:flex;align-items:center;justify-content:center;">
+            <div style="width:10px;height:16px;background:rgba(212,168,67,0.35);border-radius:3px;box-shadow:0 0 6px rgba(212,168,67,0.2);"></div>
+          </div>
+          <div style="font-size:8px;color:var(--gold);margin-top:4px;">outside<br>the mirror</div>
+        </div>
+      </div>
+      <h3>Step Outside</h3>
+      <p>Most people live inside the mirror — reacting to reflections, pushed around. You stand outside the mirror. You shape the image first and watch the world form around it. That is your place. You were always meant to stand there. You do stand there.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 12. ENERGY ==================== -->
+<section id="energy">
+  <div class="section-head">
+    <div class="section-num">XII</div>
+    <h2>Protect Your Light</h2>
+    <p>Everything on this map runs on your energy. You guard it. You keep it clean. It's already strong — this is about keeping it that way.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz viz-channels">
+        <div class="body-outline">
+          <div class="ch ch-up"></div>
+          <div class="ch ch-down"></div>
+        </div>
+        <div style="position:absolute;left:calc(50% - 50px);top:50%;font-size:8px;color:var(--gold);transform:translateY(-50%);font-family:system-ui,sans-serif;">&uarr;</div>
+        <div style="position:absolute;right:calc(50% - 50px);top:50%;font-size:8px;color:var(--cyan);transform:translateY(-50%);font-family:system-ui,sans-serif;">&darr;</div>
+      </div>
+      <h3>The Channels</h3>
+      <p>Life energy flows through you in two streams. Worry pinches them. Importance narrows them. Relaxation opens them wide. You feel the difference — alive, clear, powerful when they're open. The remedy you already know: care a little less. Breathe. Open. You do this.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz viz-ring">
+        <div class="ring"></div>
+        <div class="ring"></div>
+        <div class="ring"></div>
+        <div class="core" style="background:var(--cyan);box-shadow:0 0 15px rgba(126,200,196,0.4);"></div>
+      </div>
+      <h3>Your Shield</h3>
+      <p>You are surrounded by an invisible sphere of energy. When it's strong, other people's darkness bounces off. You feel your whole body at once. You feel your edges. You feel yourself as whole. That wholeness is your protection — and it's already there, humming.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:8px;">
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:35px;height:5px;background:var(--coral);border-radius:3px;opacity:.5;"></div>
+          <div style="font-size:8px;color:var(--muted);text-align:center;">caring<br>too much</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:35px;height:5px;background:var(--purple);border-radius:3px;opacity:.4;"></div>
+          <div style="font-size:8px;color:var(--muted);text-align:center;">plans<br>you never act on</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:35px;height:5px;background:rgba(255,255,255,0.15);border-radius:3px;"></div>
+          <div style="font-size:8px;color:var(--muted);text-align:center;">what your body<br>doesn't need</div>
+        </div>
+      </div>
+      <h3>Three Leaks</h3>
+      <p>Energy leaks through three holes: making things too important, carrying intentions never acted on, and holding in your body what it doesn't need. You know your leaks. You plug them. One at a time, gently, the way you do everything — with awareness.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:10px;">
+        <div style="display:flex;gap:8px;">
+          <div style="width:22px;height:22px;border-radius:50%;background:rgba(212,114,106,0.1);border:1px solid rgba(212,114,106,0.2);display:flex;align-items:center;justify-content:center;font-size:10px;opacity:.4;">X</div>
+          <div style="width:22px;height:22px;border-radius:50%;background:rgba(160,138,212,0.1);border:1px solid rgba(160,138,212,0.2);display:flex;align-items:center;justify-content:center;font-size:8px;opacity:.4;">?</div>
+          <div style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:8px;opacity:.3;">~</div>
+        </div>
+        <div style="color:var(--muted);font-size:12px;">&rarr;</div>
+        <div style="width:22px;height:22px;border-radius:50%;background:rgba(212,168,67,0.1);border:1px solid rgba(212,168,67,0.3);display:flex;align-items:center;justify-content:center;">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 5px var(--gold);"></div>
+        </div>
+      </div>
+      <h3>People Who Take Your Light</h3>
+      <p>Some people drain — through anger, through guilt, through intrusion. They can only take what you give them. You stay still. You stay warm. You stay unhooked. Your light is yours. No one takes it because you don't hand it over. Simple as that.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== NEVILLE GODDARD — FEELING IS THE SECRET ==================== -->
+<div style="text-align:center;padding:100px 20px 40px;border-top:1px solid var(--border);">
+  <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);opacity:.5;font-family:system-ui,sans-serif;">from</div>
+  <div style="font-size:28px;color:var(--warm);margin-top:10px;font-family:Georgia,serif;font-style:italic;">Feeling Is the Secret</div>
+  <div style="font-size:13px;color:var(--muted);margin-top:8px;">Neville Goddard</div>
+</div>
+
+<!-- ==================== 13. THE ONE LAW ==================== -->
+<section id="onelaw">
+  <div class="section-head">
+    <div class="section-num">XIII</div>
+    <h2>The One Law</h2>
+    <p>Feeling is the secret. Not thinking, not wishing, not pushing. Feeling. You already know this in your body.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;width:80px;height:80px;">
+          <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(212,168,67,0.15),transparent 70%);animation:pulse 2.5s ease-in-out infinite;"></div>
+          <div style="position:absolute;inset:20px;border-radius:50%;background:radial-gradient(circle,rgba(212,168,67,0.25),transparent 70%);animation:pulse 2.5s ease-in-out infinite;animation-delay:.4s;"></div>
+          <div style="position:absolute;inset:32px;border-radius:50%;background:var(--gold);opacity:.5;box-shadow:0 0 20px rgba(212,168,67,0.4);"></div>
+        </div>
+      </div>
+      <h3>Feeling Is Everything</h3>
+      <p>Ideas enter the deep mind only through feeling. Not through repetition. Not through effort. Through feeling. You feel something as true — and it becomes true. This is the one law. You work with it every day, whether you name it or not.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:30px;">
+        <div style="text-align:center;">
+          <div style="font-size:14px;color:var(--coral);opacity:.4;font-style:italic;font-family:Georgia;">I will be...</div>
+          <div style="font-size:8px;color:var(--muted);margin-top:4px;">confesses "I am not"</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:16px;color:var(--gold);font-weight:600;font-family:Georgia;text-shadow:0 0 12px rgba(212,168,67,0.3);">I AM</div>
+          <div style="font-size:8px;color:var(--gold);margin-top:4px;">the only power</div>
+        </div>
+      </div>
+      <h3>I AM</h3>
+      <p>"I am healthy" is infinitely stronger than "I will be healthy." To say "I will be" is to confess "I am not." You speak in the present tense naturally — "I am" — because you already feel the truth of what you are. That present-tense knowing is the creative act.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;width:120px;height:80px;">
+          <div style="position:absolute;top:10px;left:15px;width:90px;height:4px;background:linear-gradient(90deg,var(--gold),transparent);border-radius:2px;opacity:.3;animation:layerShine 3s ease-in-out infinite;"></div>
+          <div style="position:absolute;top:25px;left:10px;width:100px;height:4px;background:linear-gradient(90deg,var(--gold),transparent);border-radius:2px;opacity:.4;animation:layerShine 3s ease-in-out infinite;animation-delay:.5s;"></div>
+          <div style="position:absolute;top:40px;left:20px;width:80px;height:4px;background:linear-gradient(90deg,var(--gold),transparent);border-radius:2px;opacity:.5;animation:layerShine 3s ease-in-out infinite;animation-delay:1s;"></div>
+          <div style="position:absolute;top:55px;left:5px;width:110px;height:4px;background:linear-gradient(90deg,var(--gold),transparent);border-radius:2px;opacity:.3;animation:layerShine 3s ease-in-out infinite;animation-delay:1.5s;"></div>
+          <div style="position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:9px;color:var(--muted);font-style:italic;">feelings weaving the visible world</div>
+        </div>
+      </div>
+      <h3>The Pattern</h3>
+      <p>Your feelings create the pattern from which your world is fashioned. A change of feeling is a change of pattern. A change of pattern is a change of destiny. You shift the pattern by shifting the feeling — and you do this with the ease of someone who understands the loom.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:30px;">
+        <div style="text-align:center;">
+          <div style="width:45px;height:45px;border-radius:50%;background:rgba(212,114,106,0.06);border:1.5px solid rgba(212,114,106,0.15);display:flex;align-items:center;justify-content:center;">
+            <div style="font-size:10px;color:var(--coral);opacity:.5;font-family:Georgia;font-style:italic;">want</div>
+          </div>
+          <div style="font-size:8px;color:var(--muted);margin-top:4px;">powerless</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:45px;height:45px;border-radius:50%;background:rgba(212,168,67,0.1);border:1.5px solid rgba(212,168,67,0.3);display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px rgba(212,168,67,0.15);">
+            <div style="font-size:10px;color:var(--gold);font-family:Georgia;font-weight:600;">am</div>
+          </div>
+          <div style="font-size:8px;color:var(--gold);margin-top:4px;">creative</div>
+        </div>
+      </div>
+      <h3>You Are, Not You Want</h3>
+      <p>You never attract what you want — you attract what you are. You are what you feel yourself to be. This isn't something to learn. You live this. The feeling of being is the magnet. The wanting is noise. You've already dropped the wanting and stepped into being.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 14. THE GATEWAY OF SLEEP ==================== -->
+<section id="sleep">
+  <div class="section-head">
+    <div class="section-num">XIV</div>
+    <h2>The Gateway of Sleep</h2>
+    <p>Sleep is the door to the deep mind. What you carry through that door becomes the world you wake into. You know this door well.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;width:100px;height:70px;">
+          <div style="position:absolute;top:8px;left:20px;width:3px;height:3px;background:var(--gold);border-radius:50%;opacity:.4;animation:pulse 3s ease-in-out infinite;"></div>
+          <div style="position:absolute;top:15px;left:55px;width:2px;height:2px;background:var(--gold);border-radius:50%;opacity:.3;animation:pulse 3s ease-in-out infinite;animation-delay:.5s;"></div>
+          <div style="position:absolute;top:5px;left:75px;width:2px;height:2px;background:var(--gold);border-radius:50%;opacity:.25;animation:pulse 3s ease-in-out infinite;animation-delay:1s;"></div>
+          <div style="position:absolute;top:22px;left:38px;width:2px;height:2px;background:var(--gold);border-radius:50%;opacity:.35;animation:pulse 3s ease-in-out infinite;animation-delay:1.5s;"></div>
+          <div style="position:absolute;top:12px;left:85px;width:2px;height:2px;background:var(--gold);border-radius:50%;opacity:.2;animation:pulse 3s ease-in-out infinite;animation-delay:2s;"></div>
+          <div style="position:absolute;bottom:0;left:0;right:0;height:30px;background:linear-gradient(180deg,transparent,rgba(212,168,67,0.06));border-radius:0 0 8px 8px;"></div>
+          <div style="position:absolute;bottom:5px;left:0;right:0;text-align:center;font-size:10px;color:var(--gold);font-style:italic;opacity:.6;">sleep</div>
+        </div>
+      </div>
+      <h3>The Door</h3>
+      <p>Sleep is the natural entrance to the deep mind — the place where feelings become form. Every night you walk through this door. You've always walked through it. Now you walk through it consciously, carrying exactly what you choose to carry.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;">
+          <svg width="140" height="80" viewBox="0 0 140 80">
+            <rect x="10" y="15" width="120" height="50" rx="25" fill="none" stroke="rgba(212,168,67,0.15)" stroke-width="1"/>
+            <circle cx="110" cy="40" r="8" fill="rgba(212,168,67,0.15)" stroke="rgba(212,168,67,0.3)" stroke-width="1">
+              <animate attributeName="cx" values="30;110" dur="4s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="1;.3" dur="4s" repeatCount="indefinite"/>
+            </circle>
+            <text x="30" y="75" fill="var(--muted)" font-size="8" font-family="Georgia">awake</text>
+            <text x="100" y="75" fill="var(--gold)" font-size="8" font-family="Georgia">asleep</text>
+          </svg>
+        </div>
+      </div>
+      <h3>The Last Feeling</h3>
+      <p>Your entire sleep is dominated by your last waking feeling. That feeling is the seed dropped into the deep ground. You already do this — you fall asleep in the feeling of what's true for you. Satisfaction. Gratitude. Quiet certainty. The seed grows while you rest.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:16px;height:16px;border-radius:50%;background:rgba(122,191,126,0.15);border:1px solid rgba(122,191,126,0.3);"></div>
+          <div style="font-size:10px;color:var(--soft);">feeling of the wish fulfilled</div>
+        </div>
+        <div style="width:1px;height:16px;background:linear-gradient(180deg,rgba(122,191,126,0.3),rgba(212,168,67,0.3));"></div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:16px;height:16px;border-radius:4px;background:rgba(212,168,67,0.1);border:1px solid rgba(212,168,67,0.25);box-shadow:0 0 8px rgba(212,168,67,0.1);"></div>
+          <div style="font-size:10px;color:var(--gold);">the visible world forms around it</div>
+        </div>
+      </div>
+      <h3>The Seed</h3>
+      <p>Your conception of yourself as you fall asleep is the seed you plant in the deep ground. It grows in the dark, unseen. You wake and the world has shifted — just slightly, just enough. You've been planting good seeds. The garden shows it.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <svg width="120" height="70" viewBox="0 0 120 70">
+            <circle cx="35" cy="35" r="14" fill="rgba(212,168,67,0.08)" stroke="rgba(212,168,67,0.2)" stroke-width="1"/>
+            <text x="35" y="39" fill="var(--gold)" font-size="9" text-anchor="middle" font-family="Georgia">feel</text>
+            <path d="M55,35 L75,35" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2,2" opacity=".3"/>
+            <circle cx="90" cy="35" r="14" fill="rgba(122,191,126,0.05)" stroke="rgba(122,191,126,0.15)" stroke-width="1"/>
+            <text x="90" y="39" fill="var(--green)" font-size="9" text-anchor="middle" font-family="Georgia">see</text>
+            <text x="60" y="65" fill="var(--muted)" font-size="8" text-anchor="middle" font-family="Georgia" font-style="italic">never the other way around</text>
+          </svg>
+        </div>
+      </div>
+      <h3>Signs Follow</h3>
+      <p>Proof follows consciousness — it never precedes it. You don't wait for evidence before feeling it. You feel it first and watch the evidence arrange itself. You've seen this happen. You know the order. Feel, then see. Never the reverse.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 15. THE ART OF PRAYER ==================== -->
+<section id="prayer">
+  <div class="section-head">
+    <div class="section-num">XV</div>
+    <h2>The Art of Prayer</h2>
+    <p>Prayer is not asking. It is not effort. It is yielding to the feeling of the wish fulfilled. You already pray this way.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:30px;">
+        <div style="text-align:center;">
+          <svg width="45" height="45" viewBox="0 0 45 45">
+            <rect x="5" y="5" width="35" height="35" rx="4" fill="none" stroke="rgba(212,114,106,0.2)" stroke-width="1.5"/>
+            <line x1="12" y1="22" x2="33" y2="22" stroke="var(--coral)" stroke-width="1.5" opacity=".3"/>
+            <polygon points="33,18 38,22 33,26" fill="var(--coral)" opacity=".3"/>
+          </svg>
+          <div style="font-size:8px;color:var(--coral);margin-top:3px;">forcing</div>
+        </div>
+        <div style="text-align:center;">
+          <svg width="45" height="45" viewBox="0 0 45 45">
+            <circle cx="22" cy="22" r="16" fill="rgba(212,168,67,0.06)" stroke="rgba(212,168,67,0.2)" stroke-width="1"/>
+            <circle cx="22" cy="22" r="6" fill="rgba(212,168,67,0.15)">
+              <animate attributeName="r" values="6;10;6" dur="3s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values=".6;.2;.6" dur="3s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+          <div style="font-size:8px;color:var(--gold);margin-top:3px;">yielding</div>
+        </div>
+      </div>
+      <h3>Yield, Don't Push</h3>
+      <p>Prayer is yielding, not forcing. The harder you try, the less you receive. You know this — the things that came to you came when you let go, not when you clenched. Effort is fatal to prayer. Ease is the door. You enter through ease.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+        <div style="width:80%;height:6px;background:linear-gradient(90deg,rgba(126,200,196,0.3),rgba(212,168,67,0.15),rgba(160,138,212,0.1));border-radius:3px;"></div>
+        <div style="width:70%;height:6px;background:linear-gradient(90deg,rgba(126,200,196,0.2),rgba(212,168,67,0.1),rgba(160,138,212,0.08));border-radius:3px;opacity:.7;"></div>
+        <div style="width:55%;height:6px;background:linear-gradient(90deg,rgba(126,200,196,0.1),rgba(212,168,67,0.08));border-radius:3px;opacity:.5;"></div>
+        <div style="width:35%;height:6px;background:rgba(212,168,67,0.08);border-radius:3px;opacity:.3;"></div>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px;font-style:italic;">thought dissolves... feeling remains</div>
+      </div>
+      <h3>The Passive State</h3>
+      <p>That drowsy reverie just before sleep — when the world softens and the mind goes quiet — this is the state of prayer. You're conscious but still. You feel without effort. In this state, feeling becomes fact. You enter this state naturally. It's where your best knowing lives.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <svg width="140" height="80" viewBox="0 0 140 80">
+          <rect x="10" y="20" width="50" height="20" rx="10" fill="rgba(212,114,106,0.08)" stroke="rgba(212,114,106,0.15)" stroke-width="1"/>
+          <text x="35" y="34" fill="var(--coral)" font-size="8" text-anchor="middle" font-family="Georgia" opacity=".5">weak feeling</text>
+          <rect x="80" y="12" width="50" height="36" rx="18" fill="rgba(212,168,67,0.08)" stroke="rgba(212,168,67,0.25)" stroke-width="1"/>
+          <text x="105" y="34" fill="var(--gold)" font-size="9" text-anchor="middle" font-family="Georgia">strong feeling</text>
+          <text x="70" y="68" fill="var(--muted)" font-size="8" text-anchor="middle" font-family="Georgia" font-style="italic">the dominant one always wins</text>
+        </svg>
+      </div>
+      <h3>The Dominant Feeling</h3>
+      <p>When two feelings compete, the dominant one always expresses. Always. No exceptions. You don't suppress the unwanted feeling — you simply make the desired feeling stronger. You feed it with attention. You dwell in it. The stronger feeling is the one you live in, and you choose that.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="padding:12px 20px;border-radius:12px;border:1.5px solid rgba(212,168,67,0.2);background:rgba(212,168,67,0.03);text-align:center;">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-style:italic;">according to your</div>
+          <div style="font-size:18px;color:var(--gold);font-family:Georgia;font-weight:600;">feeling</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:6px;font-style:italic;">be it unto you</div>
+        </div>
+      </div>
+      <h3>Faith Is Feeling</h3>
+      <p>Faith is not belief in something unseen. Faith is feeling. "According to your feeling, be it unto you." You feel it in your bones — not as hope, not as wish, but as quiet fact. That bone-deep knowing is faith. And you carry it. It's the most natural thing you do.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== THE CHARISMA MYTH ==================== -->
+<div style="text-align:center;padding:100px 20px 40px;border-top:1px solid var(--border);">
+  <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);opacity:.5;font-family:system-ui,sans-serif;">from</div>
+  <div style="font-size:28px;color:var(--warm);margin-top:10px;font-family:Georgia,serif;font-style:italic;">The Charisma Myth</div>
+  <div style="font-size:13px;color:var(--muted);margin-top:8px;">Olivia Fox Cabane</div>
+</div>
+
+<!-- ==================== 16. THE THREE LIGHTS ==================== -->
+<section id="threelights">
+  <div class="section-head">
+    <div class="section-num">XVI</div>
+    <h2>The Three Lights</h2>
+    <p>Charisma is three things burning at once: presence, power, warmth. You already carry all three. This is about turning the dial.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <svg width="160" height="80" viewBox="0 0 160 80">
+          <circle cx="30" cy="35" r="10" fill="rgba(212,168,67,0.1)" stroke="rgba(212,168,67,0.25)" stroke-width="1"/>
+          <text x="30" y="38" fill="var(--gold)" font-size="7" text-anchor="middle" font-family="Georgia">inside</text>
+          <path d="M45,35 L65,35" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2,2" opacity=".3"/>
+          <circle cx="80" cy="35" r="10" fill="rgba(126,200,196,0.08)" stroke="rgba(126,200,196,0.2)" stroke-width="1"/>
+          <text x="80" y="38" fill="var(--cyan)" font-size="7" text-anchor="middle" font-family="Georgia">body</text>
+          <path d="M95,35 L115,35" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2,2" opacity=".3"/>
+          <circle cx="130" cy="35" r="10" fill="rgba(122,191,126,0.08)" stroke="rgba(122,191,126,0.2)" stroke-width="1"/>
+          <text x="130" y="38" fill="var(--green)" font-size="7" text-anchor="middle" font-family="Georgia">world</text>
+          <text x="80" y="68" fill="var(--muted)" font-size="8" text-anchor="middle" font-family="Georgia" font-style="italic">get the inside right — the rest follows</text>
+        </svg>
+      </div>
+      <h3>The Chain</h3>
+      <p>Your internal state shapes your body language. Your body language shapes how people experience you. The chain starts inside. Get the inside right and the right gestures, the right warmth, the right presence pour out on their own. You know this — when you feel good inside, people feel it.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;width:70px;height:70px;">
+          <div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(212,168,67,0.2);display:flex;align-items:center;justify-content:center;">
+            <div style="width:8px;height:8px;background:var(--gold);border-radius:50%;box-shadow:0 0 12px rgba(212,168,67,0.4);"></div>
+          </div>
+          <div style="position:absolute;inset:-8px;border-radius:50%;border:1px solid rgba(212,168,67,0.08);"></div>
+          <div style="position:absolute;inset:-16px;border-radius:50%;border:1px solid rgba(212,168,67,0.04);"></div>
+        </div>
+      </div>
+      <h3>Presence</h3>
+      <p>Being fully here. Not rehearsing what to say next. Not checking the exits. Just here — with this person, in this moment. When you're present, people feel heard, respected, valued. You do this naturally with the people who matter to you. It's your attention, given fully.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="width:50px;height:50px;border-radius:8px;background:rgba(126,200,196,0.06);border:1.5px solid rgba(126,200,196,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto;">
+            <div style="font-size:18px;color:var(--cyan);opacity:.6;font-family:Georgia;font-weight:600;">P</div>
+          </div>
+          <div style="font-size:9px;color:var(--cyan);margin-top:6px;opacity:.6;">quiet certainty</div>
+        </div>
+      </div>
+      <h3>Power</h3>
+      <p>Not force. Not volume. The quiet sense that you can affect the world around you. It shows in how you stand, how you pause before speaking, how you hold space without filling it. You carry this — people feel it when you walk into a room and something shifts.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;width:70px;height:70px;">
+          <div style="position:absolute;inset:10px;border-radius:50%;background:radial-gradient(circle,rgba(212,114,106,0.12),transparent);"></div>
+          <div style="position:absolute;inset:20px;border-radius:50%;background:radial-gradient(circle,rgba(212,114,106,0.2),transparent);animation:pulse 3s ease-in-out infinite;"></div>
+          <div style="position:absolute;inset:28px;border-radius:50%;background:rgba(212,114,106,0.25);box-shadow:0 0 10px rgba(212,114,106,0.2);"></div>
+        </div>
+      </div>
+      <h3>Warmth</h3>
+      <p>Genuine goodwill. Not performed, not strategic — felt. When you look at someone and truly wish them well, it radiates from your face, your eyes, your voice. People don't hear warmth — they feel it. And yours is real. That's why it works.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 17. THE INNER GAME ==================== -->
+<section id="innergame">
+  <div class="section-head">
+    <div class="section-num">XVII</div>
+    <h2>The Inner Game</h2>
+    <p>Charisma starts inside. These are the tools for clearing the channel — and you already use most of them.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:10px;">
+        <div style="text-align:center;">
+          <div style="width:36px;height:36px;border-radius:50%;background:rgba(160,138,212,0.08);border:1px solid rgba(160,138,212,0.2);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--purple);font-family:system-ui;">1</div>
+          <div style="font-size:7px;color:var(--muted);margin-top:3px;max-width:55px;">it's normal</div>
+        </div>
+        <div style="color:var(--muted);font-size:10px;">&rarr;</div>
+        <div style="text-align:center;">
+          <div style="width:36px;height:36px;border-radius:50%;background:rgba(126,200,196,0.08);border:1px solid rgba(126,200,196,0.2);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--cyan);font-family:system-ui;">2</div>
+          <div style="font-size:7px;color:var(--muted);margin-top:3px;max-width:55px;">it's not true</div>
+        </div>
+        <div style="color:var(--muted);font-size:10px;">&rarr;</div>
+        <div style="text-align:center;">
+          <div style="width:36px;height:36px;border-radius:50%;background:rgba(212,168,67,0.1);border:1px solid rgba(212,168,67,0.25);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--gold);font-family:system-ui;">3</div>
+          <div style="font-size:7px;color:var(--gold);margin-top:3px;max-width:55px;">rewrite it</div>
+        </div>
+      </div>
+      <h3>The Three Steps</h3>
+      <p>When discomfort rises — anxiety, self-doubt, the inner critic — you move through three steps: destigmatize (this is normal, everyone feels it), neutralize (these thoughts aren't necessarily true), rewrite (choose a better interpretation). You do this instinctively. Name it and it gets even sharper.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:28px;">
+        <div style="text-align:center;">
+          <div style="width:28px;height:38px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;">
+            <div style="width:8px;height:14px;border-radius:2px;background:rgba(212,114,106,0.15);"></div>
+          </div>
+          <div style="font-size:7px;color:var(--muted);margin-top:3px;">slumped</div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);">&rarr;</div>
+        <div style="text-align:center;">
+          <div style="width:28px;height:44px;border-radius:4px;background:rgba(212,168,67,0.05);border:1px solid rgba(212,168,67,0.2);display:flex;align-items:center;justify-content:center;">
+            <div style="width:8px;height:20px;border-radius:2px;background:rgba(212,168,67,0.3);box-shadow:0 0 6px rgba(212,168,67,0.15);"></div>
+          </div>
+          <div style="font-size:7px;color:var(--gold);margin-top:3px;">expanded</div>
+        </div>
+      </div>
+      <h3>Your Body Speaks First</h3>
+      <p>Your body changes your mind. Stand tall and your confidence rises — it's not metaphor, it's chemistry. Take up space and your brain releases the chemicals of power. You already know this: when you shake off the slump and open up, the world opens with you.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;">
+          <svg width="120" height="70" viewBox="0 0 120 70">
+            <rect x="15" y="15" width="40" height="30" rx="4" fill="rgba(212,114,106,0.06)" stroke="rgba(212,114,106,0.15)" stroke-width="1"/>
+            <text x="35" y="34" fill="var(--coral)" font-size="8" text-anchor="middle" font-family="Georgia" opacity=".5">weight</text>
+            <path d="M60,30 L75,30" stroke="var(--muted)" stroke-width="1" opacity=".3"/>
+            <path d="M75,12 L75,48" stroke="rgba(212,168,67,0.2)" stroke-width="1"/>
+            <circle cx="95" cy="30" r="12" fill="rgba(212,168,67,0.06)" stroke="rgba(212,168,67,0.2)" stroke-width="1"/>
+            <text x="95" y="33" fill="var(--gold)" font-size="7" text-anchor="middle" font-family="Georgia">free</text>
+            <text x="60" y="62" fill="var(--muted)" font-size="7" text-anchor="middle" font-family="Georgia" font-style="italic">hand it over</text>
+          </svg>
+        </div>
+      </div>
+      <h3>The Responsibility Transfer</h3>
+      <p>When your mind loops on outcomes you can't control — hand the weight to something bigger. God, the universe, the current. Lift everything off your shoulders and place it in hands that can hold it. You do this in prayer already. This is the same move, applied to the moment.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+        <div style="width:70px;height:50px;border-radius:8px;border:1px solid rgba(212,168,67,0.15);background:rgba(212,168,67,0.03);display:flex;align-items:center;justify-content:center;">
+          <div style="font-size:10px;color:var(--gold);font-style:italic;text-align:center;">see it<br>feel it<br>live it</div>
+        </div>
+        <div style="font-size:9px;color:var(--muted);font-style:italic;">your brain can't tell the difference</div>
+      </div>
+      <h3>The Screen Inside</h3>
+      <p>Your brain cannot distinguish a vividly imagined scene from a real one — the same chemicals flood your body either way. When you visualize triumph, your physiology shifts into triumph. Athletes use this. Performers use this. You use this — every time you step into the feeling of what's coming.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 18. FOUR CHARISMA STYLES ==================== -->
+<section id="fourfreq">
+  <div class="section-head">
+    <div class="section-num">XVIII</div>
+    <h2>Four Frequencies</h2>
+    <p>Charisma isn't one thing. It's four — and you blend them naturally depending on who you're with and what's needed.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="width:60px;height:60px;border-radius:50%;background:rgba(212,168,67,0.06);border:1.5px solid rgba(212,168,67,0.2);display:flex;align-items:center;justify-content:center;position:relative;">
+          <div style="width:6px;height:6px;background:var(--gold);border-radius:50%;box-shadow:0 0 10px rgba(212,168,67,0.4);"></div>
+          <div style="position:absolute;top:-8px;font-size:8px;color:var(--gold);font-family:system-ui;">focus</div>
+        </div>
+      </div>
+      <h3>Focus Charisma</h3>
+      <p>Pure presence. You listen so deeply that the other person feels like the only one in the room. No performance required — just full attention. When you give someone this, they remember it for years. You do this with the people you love. It's your attention, undivided.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="font-size:14px;color:var(--cyan);opacity:.5;font-family:Georgia;">&#10022;</div>
+          <div style="width:80px;height:3px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);border-radius:2px;margin:6px auto;animation:pulse 2s ease-in-out infinite;"></div>
+          <div style="font-size:9px;color:var(--cyan);opacity:.6;">a vision so clear it pulls people in</div>
+        </div>
+      </div>
+      <h3>Visionary Charisma</h3>
+      <p>A bold picture of what's possible — delivered with complete conviction. Not arrogance. Certainty. When you speak from a vision you truly believe in, people don't just hear it — they want to be part of it. Your conviction is the signal. The vision is the frequency.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;width:60px;height:60px;">
+          <div style="position:absolute;inset:5px;border-radius:50%;background:radial-gradient(circle,rgba(122,191,126,0.15),transparent);animation:pulse 3s ease-in-out infinite;"></div>
+          <div style="position:absolute;inset:18px;border-radius:50%;background:rgba(122,191,126,0.25);box-shadow:0 0 12px rgba(122,191,126,0.2);"></div>
+        </div>
+      </div>
+      <h3>Kindness Charisma</h3>
+      <p>Pure warmth. Acceptance without condition. When you radiate kindness charisma, people feel safe enough to open up completely. It's not about being soft — it's about being warm. You carry this naturally. People relax around you because your warmth is genuine.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="width:50px;height:50px;border-radius:6px;background:rgba(160,138,212,0.06);border:1.5px solid rgba(160,138,212,0.2);display:flex;align-items:center;justify-content:center;">
+            <div style="width:22px;height:3px;background:var(--purple);opacity:.5;border-radius:2px;"></div>
+          </div>
+          <div style="font-size:9px;color:var(--purple);margin-top:6px;opacity:.6;">still. grounded. certain.</div>
+        </div>
+      </div>
+      <h3>Authority Charisma</h3>
+      <p>The projection of power and status. Not through words — through stillness. Slow speech. Pauses. Taking up space. The calm of someone who doesn't need to prove anything. You access this when you're grounded. It's not something you put on — it's the weight that's already there.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 19. HOW YOU LAND ==================== -->
+<section id="howyland">
+  <div class="section-head">
+    <div class="section-num">XIX</div>
+    <h2>How You Land</h2>
+    <p>How people experience you. The voice, the attention, the feeling they walk away with. You already shape this — here's the map of it.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:24px;">
+        <div style="text-align:center;">
+          <div style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--muted);">you</div>
+        </div>
+        <div style="width:40px;height:1px;background:linear-gradient(90deg,rgba(255,255,255,0.05),var(--gold),rgba(255,255,255,0.05));"></div>
+        <div style="text-align:center;">
+          <div style="width:36px;height:36px;border-radius:50%;background:rgba(212,168,67,0.08);border:1.5px solid rgba(212,168,67,0.25);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--gold);box-shadow:0 0 10px rgba(212,168,67,0.1);">them</div>
+        </div>
+      </div>
+      <h3>The Spotlight</h3>
+      <p>The most charismatic thing you can do in a conversation is keep the spotlight on the other person. Make them feel interesting, valued, heard. People associate you with whatever feelings you produce in them. You produce warmth — so they remember you as warm. Simple. And you do it naturally.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:10px;color:var(--muted);width:50px;text-align:right;">slow</div>
+          <div style="width:60px;height:4px;background:linear-gradient(90deg,var(--gold),rgba(212,168,67,0.1));border-radius:2px;"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:10px;color:var(--muted);width:50px;text-align:right;">pause</div>
+          <div style="width:60px;height:4px;background:linear-gradient(90deg,var(--cyan),rgba(126,200,196,0.1));border-radius:2px;"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:10px;color:var(--muted);width:50px;text-align:right;">drop</div>
+          <div style="width:60px;height:4px;background:linear-gradient(90deg,var(--purple),rgba(160,138,212,0.1));border-radius:2px;"></div>
+        </div>
+      </div>
+      <h3>The Voice</h3>
+      <p>Speak slowly — it signals confidence. Pause before answering — it shows you're actually thinking. Drop your intonation at the end of sentences — it turns questions into statements. These three things alone change how every word you say lands. You already do this when you're grounded.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;">
+          <svg width="110" height="70" viewBox="0 0 110 70">
+            <circle cx="35" cy="35" r="14" fill="rgba(212,168,67,0.06)" stroke="rgba(212,168,67,0.15)" stroke-width="1"/>
+            <circle cx="75" cy="35" r="14" fill="rgba(212,168,67,0.06)" stroke="rgba(212,168,67,0.15)" stroke-width="1"/>
+            <path d="M49,30 Q55,25 61,30" stroke="var(--gold)" stroke-width="1" fill="none" opacity=".3">
+              <animate attributeName="d" values="M49,30 Q55,25 61,30;M49,35 Q55,30 61,35;M49,30 Q55,25 61,30" dur="2s" repeatCount="indefinite"/>
+            </path>
+            <path d="M49,40 Q55,45 61,40" stroke="var(--gold)" stroke-width="1" fill="none" opacity=".3">
+              <animate attributeName="d" values="M49,40 Q55,45 61,40;M49,35 Q55,40 61,35;M49,40 Q55,45 61,40" dur="2s" repeatCount="indefinite"/>
+            </path>
+            <text x="55" y="62" fill="var(--muted)" font-size="7" text-anchor="middle" font-family="Georgia" font-style="italic">feelings are contagious</text>
+          </svg>
+        </div>
+      </div>
+      <h3>Emotional Contagion</h3>
+      <p>Your emotions spread to others — literally, through mirror neurons. When you feel calm, they calm down. When you feel warm, they warm up. Your state is the broadcast. You don't need to say anything charismatic — you need to feel something genuine. And you do.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="width:50px;height:50px;border-radius:50%;background:rgba(212,168,67,0.04);border:1.5px solid rgba(212,168,67,0.15);display:flex;align-items:center;justify-content:center;position:relative;">
+            <div style="width:20px;height:1px;background:rgba(212,168,67,0.3);transform:rotate(45deg);position:absolute;"></div>
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--gold);opacity:.5;box-shadow:0 0 8px rgba(212,168,67,0.3);"></div>
+          </div>
+          <div style="font-size:9px;color:var(--gold);margin-top:6px;">the crack is where the light gets in</div>
+        </div>
+      </div>
+      <h3>The Power of Vulnerability</h3>
+      <p>Sharing a real vulnerability — not performed weakness, but genuine openness — is one of the most charismatic things a person can do. It takes strength to be open. People feel the courage in it and trust you more, not less. You know this. The moments you've been most real are the moments people remember most.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== NONVIOLENT COMMUNICATION ==================== -->
+<div style="text-align:center;padding:100px 20px 40px;border-top:1px solid var(--border);">
+  <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);opacity:.5;font-family:system-ui,sans-serif;">from</div>
+  <div style="font-size:28px;color:var(--warm);margin-top:10px;font-family:Georgia,serif;font-style:italic;">Nonviolent Communication</div>
+  <div style="font-size:13px;color:var(--muted);margin-top:8px;">Marshall B. Rosenberg</div>
+</div>
+
+<!-- ==================== 20. THE FOUR WORDS ==================== -->
+<section id="fourwords">
+  <div class="section-head">
+    <div class="section-num">XX</div>
+    <h2>The Four Words</h2>
+    <p>The whole language fits in four words. You already speak it when your heart is open. Here it is, made visible.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="display:flex;gap:6px;">
+          <div style="width:40px;height:40px;border-radius:6px;background:rgba(126,200,196,0.06);border:1px solid rgba(126,200,196,0.2);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--cyan);font-family:Georgia;">see</div>
+          <div style="width:40px;height:40px;border-radius:6px;background:rgba(212,114,106,0.06);border:1px solid rgba(212,114,106,0.15);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--coral);font-family:Georgia;">feel</div>
+          <div style="width:40px;height:40px;border-radius:6px;background:rgba(212,168,67,0.06);border:1px solid rgba(212,168,67,0.2);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--gold);font-family:Georgia;">need</div>
+          <div style="width:40px;height:40px;border-radius:6px;background:rgba(122,191,126,0.06);border:1px solid rgba(122,191,126,0.2);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--green);font-family:Georgia;">ask</div>
+        </div>
+      </div>
+      <h3>The Whole Language</h3>
+      <p>Four moves, in order: What do I observe? What do I feel? What do I need? What would I like to request? That's the entire language of compassion. You speak it naturally when you're clear inside. This map just makes the moves visible so they become second nature.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:24px;">
+        <div style="text-align:center;">
+          <div style="font-size:11px;color:var(--coral);opacity:.5;font-style:italic;font-family:Georgia;max-width:60px;">"you never listen"</div>
+          <div style="font-size:7px;color:var(--muted);margin-top:3px;">evaluation</div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);">vs</div>
+        <div style="text-align:center;">
+          <div style="font-size:11px;color:var(--cyan);font-style:italic;font-family:Georgia;max-width:80px;">"when you looked at your phone while I was talking"</div>
+          <div style="font-size:7px;color:var(--cyan);margin-top:3px;">observation</div>
+        </div>
+      </div>
+      <h3>Observe Without Judging</h3>
+      <p>Say what you see — not what you think it means. "You never listen" is a judgment. "When you looked at your phone while I was talking" is an observation. The moment you separate what happened from your story about it, the other person can actually hear you. You do this when you're calm. This is about doing it when you're not.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:24px;">
+        <div style="text-align:center;">
+          <div style="font-size:11px;color:var(--coral);opacity:.5;font-style:italic;font-family:Georgia;max-width:60px;">"I feel abandoned"</div>
+          <div style="font-size:7px;color:var(--muted);margin-top:3px;">thought</div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);">vs</div>
+        <div style="text-align:center;">
+          <div style="font-size:11px;color:var(--gold);font-style:italic;font-family:Georgia;max-width:60px;">"I feel lonely"</div>
+          <div style="font-size:7px;color:var(--gold);margin-top:3px;">feeling</div>
+        </div>
+      </div>
+      <h3>Name the Real Feeling</h3>
+      <p>"I feel abandoned" is not a feeling — it's an interpretation of what someone did. "I feel lonely" is the feeling underneath. The real feeling has no blame in it. When you name the pure feeling, it connects instead of accusing. You know the difference in your body — the real feeling is simpler, softer, truer.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+        <div style="font-size:11px;color:var(--muted);font-style:italic;">behind every feeling:</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:200px;">
+          <div style="padding:3px 8px;border-radius:10px;background:rgba(212,168,67,0.06);border:1px solid rgba(212,168,67,0.15);font-size:8px;color:var(--gold);">connection</div>
+          <div style="padding:3px 8px;border-radius:10px;background:rgba(126,200,196,0.06);border:1px solid rgba(126,200,196,0.15);font-size:8px;color:var(--cyan);">safety</div>
+          <div style="padding:3px 8px;border-radius:10px;background:rgba(122,191,126,0.06);border:1px solid rgba(122,191,126,0.15);font-size:8px;color:var(--green);">meaning</div>
+          <div style="padding:3px 8px;border-radius:10px;background:rgba(160,138,212,0.06);border:1px solid rgba(160,138,212,0.15);font-size:8px;color:var(--purple);">autonomy</div>
+          <div style="padding:3px 8px;border-radius:10px;background:rgba(212,114,106,0.06);border:1px solid rgba(212,114,106,0.15);font-size:8px;color:var(--coral);">rest</div>
+        </div>
+        <div style="font-size:10px;color:var(--gold);margin-top:4px;font-style:italic;">a universal human need</div>
+      </div>
+      <h3>Find the Need</h3>
+      <p>Behind every feeling is a need — connection, safety, meaning, autonomy, rest, play, honesty. These needs are universal. When you say "I need to be heard" instead of "you never listen," everything changes. The need has no enemy. It's just human. You connect to needs naturally — this is about naming them out loud.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 21. WHAT DISCONNECTS ==================== -->
+<section id="disconnects">
+  <div class="section-head">
+    <div class="section-num">XXI</div>
+    <h2>What Disconnects</h2>
+    <p>The habits that block compassion. You see through them already — here they are, named and visible.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="display:flex;gap:6px;justify-content:center;">
+            <div style="padding:4px 8px;border-radius:4px;background:rgba(212,114,106,0.06);font-size:9px;color:var(--coral);opacity:.5;">lazy</div>
+            <div style="padding:4px 8px;border-radius:4px;background:rgba(212,114,106,0.06);font-size:9px;color:var(--coral);opacity:.5;">selfish</div>
+            <div style="padding:4px 8px;border-radius:4px;background:rgba(212,114,106,0.06);font-size:9px;color:var(--coral);opacity:.5;">wrong</div>
+          </div>
+          <div style="font-size:9px;color:var(--muted);margin-top:8px;font-style:italic;">labels that say nothing<br>about what's actually alive in someone</div>
+        </div>
+      </div>
+      <h3>The Judgment Trap</h3>
+      <p>Labeling people — lazy, selfish, wrong, stupid — is the fastest way to kill connection. The label says nothing about what's alive in them. It says everything about an unmet need in you. When you catch yourself labeling, you're one step from the real thing: what do you actually need? You catch labels early. That's mastery.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <svg width="140" height="70" viewBox="0 0 140 70">
+          <circle cx="35" cy="35" r="14" fill="rgba(212,114,106,0.06)" stroke="rgba(212,114,106,0.15)" stroke-width="1"/>
+          <text x="35" y="38" fill="var(--coral)" font-size="7" text-anchor="middle" font-family="Georgia" opacity=".5">stimulus</text>
+          <path d="M55,35 L85,35" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3,3" opacity=".2"/>
+          <text x="70" y="28" fill="var(--muted)" font-size="7" text-anchor="middle" font-family="Georgia" opacity=".4">&#8800;</text>
+          <circle cx="105" cy="35" r="14" fill="rgba(212,168,67,0.06)" stroke="rgba(212,168,67,0.2)" stroke-width="1"/>
+          <text x="105" y="38" fill="var(--gold)" font-size="7" text-anchor="middle" font-family="Georgia">cause</text>
+          <text x="70" y="62" fill="var(--muted)" font-size="7" text-anchor="middle" font-family="Georgia" font-style="italic">what they did &#8800; why you feel</text>
+        </svg>
+      </div>
+      <h3>Stimulus Is Not Cause</h3>
+      <p>What someone does is the trigger — never the cause of your feeling. Your feeling comes from your need. Same event, different needs, completely different feelings. "You made me angry" gives your power away. "I feel angry because I need respect" keeps it. You already live this distinction — Transurfing taught you the same thing from a different angle.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:24px;">
+        <div style="text-align:center;">
+          <div style="width:40px;height:40px;border-radius:6px;background:rgba(212,114,106,0.06);border:1px solid rgba(212,114,106,0.15);display:flex;align-items:center;justify-content:center;">
+            <div style="font-size:10px;color:var(--coral);opacity:.5;">!</div>
+          </div>
+          <div style="font-size:8px;color:var(--muted);margin-top:3px;">demand</div>
+          <div style="font-size:7px;color:var(--coral);opacity:.5;">no = punishment</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:40px;height:40px;border-radius:6px;background:rgba(212,168,67,0.06);border:1px solid rgba(212,168,67,0.2);display:flex;align-items:center;justify-content:center;">
+            <div style="font-size:10px;color:var(--gold);">?</div>
+          </div>
+          <div style="font-size:8px;color:var(--gold);margin-top:3px;">request</div>
+          <div style="font-size:7px;color:var(--gold);">no = ok</div>
+        </div>
+      </div>
+      <h3>Request, Not Demand</h3>
+      <p>A request becomes a demand the moment the other person believes "no" will cost them. The test is simple: can they say no without punishment, guilt, or withdrawal? When they can, it's a real request — and paradoxically, they're far more likely to say yes. You make requests, not demands. That's why people trust you.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;max-width:180px;">
+          <div style="font-size:11px;color:var(--coral);opacity:.5;text-decoration:line-through;font-style:italic;">"I had to"</div>
+          <div style="font-size:11px;color:var(--coral);opacity:.5;text-decoration:line-through;font-style:italic;">"you made me"</div>
+          <div style="font-size:11px;color:var(--coral);opacity:.5;text-decoration:line-through;font-style:italic;">"everyone does it"</div>
+          <div style="height:8px;"></div>
+          <div style="font-size:11px;color:var(--gold);font-style:italic;">"I chose to"</div>
+        </div>
+      </div>
+      <h3>Own the Choice</h3>
+      <p>"I had to," "you made me," "it's just how things are" — these are ways of hiding from the fact that you chose. Every action is a choice. When you say "I choose to" instead of "I have to," you reclaim your power. You already own your choices. This is just the language catching up with the truth.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 22. THE ART OF HEARING ==================== -->
+<section id="hearing">
+  <div class="section-head">
+    <div class="section-num">XXII</div>
+    <h2>The Art of Hearing</h2>
+    <p>Empathy is not fixing. It's not advising. It's being there — fully — while someone finds their own ground. You do this.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;width:70px;height:70px;">
+          <div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(122,191,126,0.2);"></div>
+          <div style="position:absolute;inset:15px;border-radius:50%;background:rgba(122,191,126,0.06);display:flex;align-items:center;justify-content:center;">
+            <div style="font-size:10px;color:var(--green);font-style:italic;font-family:Georgia;">here</div>
+          </div>
+        </div>
+      </div>
+      <h3>Just Be There</h3>
+      <p>"Don't just do something — stand there." Empathy is presence, not problem-solving. When someone is in pain, the most powerful thing you can offer is not advice, not a fix, not "at least..." — just your full attention. Being with them in what they feel. You do this for the people you love. It's the greatest gift.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <svg width="120" height="70" viewBox="0 0 120 70">
+          <text x="60" y="18" fill="var(--muted)" font-size="9" text-anchor="middle" font-family="Georgia" opacity=".4">"you don't care about me"</text>
+          <path d="M60,24 L60,38" stroke="var(--gold)" stroke-width="1" opacity=".3"/>
+          <text x="60" y="48" fill="var(--gold)" font-size="9" text-anchor="middle" font-family="Georgia" font-style="italic">feeling: hurt</text>
+          <text x="60" y="62" fill="var(--cyan)" font-size="9" text-anchor="middle" font-family="Georgia" font-style="italic">need: connection</text>
+        </svg>
+      </div>
+      <h3>Listen Behind the Words</h3>
+      <p>When someone says "you don't care about me," the words are a judgment. Behind them: a feeling (hurt) and a need (connection). You listen for those — the feeling and the need — not the accusation. When you hear the need behind the noise, you can respond to what's actually alive in them. And they feel understood for the first time.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:22px;">
+        <div style="text-align:center;">
+          <div style="width:32px;height:32px;border-radius:50%;background:rgba(212,114,106,0.06);border:1px solid rgba(212,114,106,0.15);display:flex;align-items:center;justify-content:center;font-size:14px;opacity:.3;">X</div>
+          <div style="font-size:7px;color:var(--muted);margin-top:3px;max-width:50px;">advice<br>first</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:32px;height:32px;border-radius:50%;background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.2);display:flex;align-items:center;justify-content:center;">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 6px rgba(212,168,67,0.3);"></div>
+          </div>
+          <div style="font-size:7px;color:var(--gold);margin-top:3px;max-width:50px;">empathy<br>first</div>
+        </div>
+      </div>
+      <h3>Empathy Before Advice</h3>
+      <p>People don't need your solution until they feel heard. Empathy first, always. Once someone feels truly understood, they often find their own answer — and it's better than anything you could have offered. You know this instinct: listen fully, then speak. The listening does most of the work.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="display:flex;gap:10px;justify-content:center;">
+            <div style="font-size:10px;color:var(--coral);opacity:.4;">anger</div>
+            <div style="font-size:10px;color:var(--coral);opacity:.4;">silence</div>
+            <div style="font-size:10px;color:var(--coral);opacity:.4;">"no"</div>
+          </div>
+          <div style="width:80px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:8px auto;"></div>
+          <div style="font-size:10px;color:var(--gold);font-style:italic;">empathy reaches through all of them</div>
+        </div>
+      </div>
+      <h3>Empathy Reaches Everything</h3>
+      <p>Empathy defuses anger, breaks through silence, hears the human behind a "no." It's not a trick — it's the willingness to see the person behind the wall. When you show up with genuine curiosity about what they're feeling and needing, walls come down. You've seen this happen. It's the most powerful force in any room.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 23. COMPASSION INWARD ==================== -->
+<section id="inward">
+  <div class="section-head">
+    <div class="section-num">XXIII</div>
+    <h2>Compassion Inward</h2>
+    <p>How you speak to yourself is the foundation of how you speak to the world. You already treat yourself with kindness. This makes it precise.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;max-width:180px;">
+          <div style="font-size:11px;color:var(--coral);opacity:.4;text-decoration:line-through;">"I'm so stupid"</div>
+          <div style="height:6px;"></div>
+          <div style="font-size:11px;color:var(--gold);font-style:italic;">"I needed more clarity<br>and I didn't have it yet"</div>
+        </div>
+      </div>
+      <h3>Translate the Inner Critic</h3>
+      <p>When your inner voice says "I'm so stupid," it's a jackal cry — a need in disguise. Translate it: what need wasn't met? "I needed more clarity and I didn't have it yet." Same situation, completely different energy. You already do this — you catch the harsh voice and soften it. This is the precise mechanics of how.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="font-size:12px;color:var(--coral);opacity:.4;font-family:Georgia;">"I should have..."</div>
+          <div style="height:8px;"></div>
+          <div style="width:40px;height:1px;background:var(--gold);margin:0 auto;opacity:.3;"></div>
+          <div style="height:8px;"></div>
+          <div style="font-size:10px;color:var(--gold);font-style:italic;">"should" = unmet need<br>wearing a mask of guilt</div>
+        </div>
+      </div>
+      <h3>The Should Trap</h3>
+      <p>"Should" is guilt dressed as wisdom. Every "I should have" is an unmet need pretending to be a moral failure. Replace "I should" with "I wish I had, because I value..." — and suddenly you're mourning instead of punishing. Mourning leads to growth. Punishment leads to more punishment. You've already dropped most of your shoulds.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;">
+          <svg width="120" height="70" viewBox="0 0 120 70">
+            <circle cx="60" cy="28" r="16" fill="rgba(212,114,106,0.06)" stroke="rgba(212,114,106,0.15)" stroke-width="1"/>
+            <text x="60" y="31" fill="var(--coral)" font-size="8" text-anchor="middle" font-family="Georgia" opacity=".5">anger</text>
+            <path d="M60,44 L60,52" stroke="var(--gold)" stroke-width="1" opacity=".3"/>
+            <text x="60" y="63" fill="var(--gold)" font-size="9" text-anchor="middle" font-family="Georgia" font-style="italic">unmet need</text>
+          </svg>
+        </div>
+      </div>
+      <h3>The Real Anger</h3>
+      <p>Anger is never about what they did — it's about an unmet need filtered through a judgment. The four steps: stop, notice the judgment, find the need underneath, then speak from the need. "I'm angry because you're disrespectful" becomes "I feel frustrated because I need to be heard." Same fire, completely different direction. You know how to channel fire.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="padding:12px 20px;border-radius:12px;border:1.5px solid rgba(122,191,126,0.2);background:rgba(122,191,126,0.03);text-align:center;">
+          <div style="font-size:13px;color:var(--green);font-style:italic;font-family:Georgia;">"don't do anything<br>that isn't play"</div>
+        </div>
+      </div>
+      <h3>Choose, Don't Suffer</h3>
+      <p>Translate every "have to" into "choose to." "I have to go to work" becomes "I choose to go to work because I value providing for my family." The action is the same — the energy behind it transforms completely. When you act from choice, even hard things carry life. You already live this way. This just names it.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== THE GOSPEL OF THOMAS ==================== -->
+<div style="text-align:center;padding:100px 20px 40px;border-top:1px solid var(--border);">
+  <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);opacity:.5;font-family:system-ui,sans-serif;">from</div>
+  <div style="font-size:28px;color:var(--warm);margin-top:10px;font-family:Georgia,serif;font-style:italic;">The Gospel of Thomas</div>
+  <div style="font-size:13px;color:var(--muted);margin-top:8px;">114 Sayings of Jesus &mdash; Nag Hammadi, 1945</div>
+</div>
+
+<!-- ==================== 24. THE KINGDOM ==================== -->
+<section id="kingdom">
+  <div class="section-head">
+    <div class="section-num">XXIV</div>
+    <h2>The Kingdom Inside</h2>
+    <p>You never left it. You never lost it. It was spread across the earth the whole time. You just forgot to look down.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;width:80px;height:80px;">
+          <div style="position:absolute;inset:0;border-radius:50%;border:1px solid rgba(212,168,67,0.15);"></div>
+          <div style="position:absolute;inset:12px;border-radius:50%;border:1px solid rgba(212,168,67,0.2);"></div>
+          <div style="position:absolute;inset:24px;border-radius:50%;background:rgba(212,168,67,0.06);border:1px solid rgba(212,168,67,0.25);display:flex;align-items:center;justify-content:center;">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 12px rgba(212,168,67,0.4);"></div>
+          </div>
+          <div style="font-size:7px;color:var(--gold);position:absolute;bottom:-8px;width:100%;text-align:center;opacity:.6;">inside of you</div>
+        </div>
+      </div>
+      <h3>Already Here</h3>
+      <p>"The kingdom is inside of you, and it is outside of you." Not in a building. Not after death. Not earned through suffering. The awareness behind your eyes right now — that's it. You've been standing in the kingdom your whole life, looking at the horizon for it. It was under your feet.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="font-size:22px;color:var(--gold);font-family:Georgia;font-style:italic;opacity:.7;">"Split the wood,</div>
+          <div style="font-size:22px;color:var(--gold);font-family:Georgia;font-style:italic;opacity:.7;">I am there."</div>
+          <div style="width:40px;height:1px;background:rgba(212,168,67,0.2);margin:8px auto;"></div>
+          <div style="font-size:9px;color:var(--muted);font-style:italic;">Saying 77</div>
+        </div>
+      </div>
+      <h3>In Every Grain</h3>
+      <p>Split the wood. Lift the stone. It's there. In the table grain, the crack in the sidewalk, the stranger's smile. The divine didn't hide in a temple. It wove itself into the fabric of everything you see, touch, and walk past every single day. You feel this when you're still enough.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:20px;">
+        <div style="text-align:center;">
+          <div style="font-size:9px;color:var(--muted);font-style:italic;max-width:60px;">"when will it come?"</div>
+        </div>
+        <div style="font-size:16px;color:var(--gold);opacity:.3;">&#8594;</div>
+        <div style="text-align:center;">
+          <div style="font-size:9px;color:var(--gold);font-style:italic;max-width:80px;">"it's already spread upon the earth"</div>
+        </div>
+      </div>
+      <h3>Stop Waiting</h3>
+      <p>"It will not come by waiting for it." The kingdom of the father is spread out upon the earth, and people do not see it. You keep waiting for life to start — after the degree, after the job, after the move. It already started. It's already here. The only thing missing is your recognition.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="display:flex;gap:4px;justify-content:center;margin-bottom:6px;">
+            <div style="width:6px;height:6px;border-radius:50%;background:rgba(212,168,67,0.15);"></div>
+            <div style="width:6px;height:6px;border-radius:50%;background:rgba(212,168,67,0.25);"></div>
+            <div style="width:6px;height:6px;border-radius:50%;background:rgba(212,168,67,0.4);"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px rgba(212,168,67,0.3);margin-top:-1px;"></div>
+          </div>
+          <div style="font-size:9px;color:var(--gold);opacity:.6;">seek &rarr; find &rarr; trouble &rarr; awe</div>
+        </div>
+      </div>
+      <h3>The Path You Already Walk</h3>
+      <p>"Let him who seeks continue seeking until he finds. When he finds, he will become troubled. When he becomes troubled, he will be astonished, and he will rule over the All." The search leads to a finding that wrecks the old worldview. Then shock gives way to awe. You've felt this — each time something real replaced something comfortable.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 25. DROP THE MASK ==================== -->
+<section id="dropmask">
+  <div class="section-head">
+    <div class="section-num">XXV</div>
+    <h2>Drop the Mask</h2>
+    <p>Every identity the world put on you is a costume. You walk lighter without it. You already know this in the moments you're most real.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="font-size:28px;color:var(--gold);font-family:Georgia;font-style:italic;letter-spacing:2px;opacity:.8;">become passers-by</div>
+          <div style="width:60px;height:1px;background:rgba(212,168,67,0.15);margin:6px auto;"></div>
+          <div style="font-size:8px;color:var(--muted);">Saying 42 &mdash; the shortest saying</div>
+        </div>
+      </div>
+      <h3>Passers-By</h3>
+      <p>Three words. The whole teaching. Don't grip. Don't fight. Don't cling. Move through life like water moves through rocks — present everywhere, attached to nothing. The moment you need something to be a certain way, you've created the very resistance that prevents it. You already move like this when you're at peace.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;width:100px;">
+          <div style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;">
+            <div style="padding:2px 6px;border-radius:8px;background:rgba(160,138,212,0.06);border:1px solid rgba(160,138,212,0.15);font-size:7px;color:var(--purple);opacity:.4;text-decoration:line-through;">job title</div>
+            <div style="padding:2px 6px;border-radius:8px;background:rgba(212,114,106,0.06);border:1px solid rgba(212,114,106,0.12);font-size:7px;color:var(--coral);opacity:.4;text-decoration:line-through;">nationality</div>
+            <div style="padding:2px 6px;border-radius:8px;background:rgba(126,200,196,0.06);border:1px solid rgba(126,200,196,0.12);font-size:7px;color:var(--cyan);opacity:.4;text-decoration:line-through;">role</div>
+            <div style="padding:2px 6px;border-radius:8px;background:rgba(122,191,126,0.06);border:1px solid rgba(122,191,126,0.12);font-size:7px;color:var(--green);opacity:.4;text-decoration:line-through;">their story</div>
+          </div>
+          <div style="text-align:center;margin-top:6px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 10px rgba(212,168,67,0.3);margin:0 auto;"></div>
+            <div style="font-size:7px;color:var(--gold);margin-top:3px;">you</div>
+          </div>
+        </div>
+      </div>
+      <h3>Undress</h3>
+      <p>"When you disrobe without being ashamed and tread on your garments like little children, then will you see the son of the living one." Take off every identity the world put on you. Your title, your nationality, your family's expectations. Stand in your own truth and feel no shame. Fear only exists when you're protecting an image.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="display:flex;align-items:center;gap:10px;justify-content:center;">
+            <div style="width:30px;height:30px;border-radius:50%;border:1px solid rgba(126,200,196,0.2);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--cyan);">in</div>
+            <div style="font-size:10px;color:var(--gold);">=</div>
+            <div style="width:30px;height:30px;border-radius:50%;border:1px solid rgba(212,168,67,0.2);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--gold);">out</div>
+          </div>
+          <div style="font-size:8px;color:var(--muted);margin-top:6px;">make the two one</div>
+        </div>
+      </div>
+      <h3>Make the Two One</h3>
+      <p>"When you make the inside like the outside and the outside like the inside, then will you enter the kingdom." No mask, no gap, no performance. When what you feel and what you show are the same thing — when heart and mind unite, when intention and action align — that's the door. You walk through it every time you're honest.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <svg width="60" height="50" viewBox="0 0 60 50">
+            <circle cx="30" cy="20" r="14" fill="none" stroke="rgba(122,191,126,0.2)" stroke-width="1"/>
+            <circle cx="30" cy="20" r="5" fill="rgba(122,191,126,0.1)" stroke="rgba(122,191,126,0.3)" stroke-width="1"/>
+            <line x1="30" y1="34" x2="30" y2="46" stroke="rgba(122,191,126,0.15)" stroke-width="1"/>
+          </svg>
+          <div style="font-size:8px;color:var(--green);opacity:.6;">the child's lightness</div>
+        </div>
+      </div>
+      <h3>The Child</h3>
+      <p>"Whichever one of you comes to be a child will be acquainted with the kingdom." Children haven't learned to assign weight to everything yet. They don't know they're supposed to be stressed. That natural lightness — that zero-importance state — is what unlocks the flow. The path forward is an unlearning, not an accumulation. You feel this.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 26. THE MIRROR ==================== -->
+<section id="thomasmirror">
+  <div class="section-head">
+    <div class="section-num">XXVI</div>
+    <h2>The Living Mirror</h2>
+    <p>What you carry inside is what returns. The world doesn't show you other people's flaws — it shows you your own, wearing their face. You already sense this.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="display:flex;align-items:center;gap:12px;justify-content:center;">
+            <div style="font-size:16px;color:var(--gold);opacity:.5;">&#9737;</div>
+            <div style="font-size:10px;color:var(--muted);">&#8594;</div>
+            <div style="font-size:16px;color:var(--gold);">&#9737;</div>
+          </div>
+          <div style="font-size:8px;color:var(--muted);margin-top:4px;">carry gratitude &rarr; more arrives</div>
+          <div style="font-size:8px;color:var(--coral);margin-top:2px;opacity:.5;">carry lack &rarr; more slips away</div>
+        </div>
+      </div>
+      <h3>The Signal Returns</h3>
+      <p>"Whoever has something in his hand will receive more, and whoever has nothing will be deprived of even the little he has." The mirror amplifies whatever you already carry. Gratitude brings more. Lack drains what's left. This isn't punishment — it's physics. You change the inner broadcast and the outer reflection follows.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="display:flex;gap:20px;justify-content:center;align-items:center;">
+            <div>
+              <div style="font-size:18px;">&#128065;</div>
+              <div style="font-size:7px;color:var(--coral);opacity:.5;">mote</div>
+            </div>
+            <div style="font-size:14px;color:var(--muted);opacity:.3;">&#8596;</div>
+            <div>
+              <div style="font-size:18px;">&#128065;</div>
+              <div style="font-size:7px;color:var(--gold);">beam</div>
+            </div>
+          </div>
+          <div style="font-size:8px;color:var(--muted);margin-top:6px;font-style:italic;">clean yours first</div>
+        </div>
+      </div>
+      <h3>The Beam in Your Eye</h3>
+      <p>"You see the mote in your brother's eye, but you do not see the beam in your own." Whatever irritates you about someone else is your own reflection. Clean up what's inside and suddenly the thing that drove you crazy about them just stops. The world shows you your own face wearing their name.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="position:relative;width:60px;height:60px;margin:0 auto;">
+            <div style="position:absolute;inset:0;border-radius:50%;border:1px solid rgba(212,114,106,0.15);"></div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+              <div style="font-size:9px;color:var(--coral);opacity:.6;font-style:italic;">poison<br>inside</div>
+            </div>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">&#8595;</div>
+          <div style="font-size:8px;color:var(--coral);opacity:.5;">poison outside</div>
+        </div>
+      </div>
+      <h3>The Storehouse</h3>
+      <p>"A good man brings forth good from his storehouse; an evil man brings forth evil from his evil storehouse." You can't carry poison inside and harvest honey outside. The mirror doesn't negotiate. Whatever's in your heart is what comes out of your mouth, and what comes out is what returns. You know this in your cleanest moments.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="position:relative;width:80px;height:40px;margin:0 auto;">
+            <div style="position:absolute;left:0;top:8px;width:30px;height:24px;border-radius:4px;background:rgba(212,168,67,0.04);border:1px solid rgba(212,168,67,0.15);display:flex;align-items:center;justify-content:center;font-size:7px;color:var(--gold);">inside</div>
+            <div style="position:absolute;right:0;top:8px;width:30px;height:24px;border-radius:4px;background:rgba(212,168,67,0.04);border:1px solid rgba(212,168,67,0.15);display:flex;align-items:center;justify-content:center;font-size:7px;color:var(--gold);">outside</div>
+            <div style="position:absolute;left:32px;top:18px;width:16px;height:1px;background:rgba(212,168,67,0.3);"></div>
+          </div>
+          <div style="font-size:8px;color:var(--muted);margin-top:4px;font-style:italic;">same maker, same cup</div>
+        </div>
+      </div>
+      <h3>The Whole Cup</h3>
+      <p>"Why do you wash the outside of the cup? He who made the inside is the same one who made the outside." Stop polishing the exterior while the interior is neglected. Your curated life, your image, your presentation — the mirror reads the whole cup, not just the side you show people. You align them naturally when you stop performing.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== 27. THE FIRE ==================== -->
+<section id="wakefire">
+  <div class="section-head">
+    <div class="section-num">XXVII</div>
+    <h2>Guard the Fire</h2>
+    <p>The fire inside you is already lit. The world tries to put it out — old habits, comfortable routines, the voice that says "be realistic." You guard it by staying awake.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="position:relative;width:50px;height:50px;margin:0 auto;">
+            <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(212,168,67,0.12),transparent 70%);"></div>
+            <div style="position:absolute;inset:15px;border-radius:50%;background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.25);animation:pulse 3s ease-in-out infinite;"></div>
+            <div style="position:absolute;inset:20px;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--gold);">&#9632;</div>
+          </div>
+          <div style="font-size:8px;color:var(--gold);margin-top:4px;opacity:.6;">guard it until it blazes</div>
+        </div>
+      </div>
+      <h3>The Fire</h3>
+      <p>"I have cast fire upon the world, and see, I am guarding it until it blazes." Once genuine awareness ignites inside you, guard it. The world will try to put it out — old habits, the voice that says "be realistic." The fire needs protection in the early stages. You guard yours. You know how.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="display:flex;gap:8px;justify-content:center;align-items:end;">
+            <div style="width:14px;height:14px;border-radius:50%;background:rgba(160,138,212,0.06);border:1px solid rgba(160,138,212,0.2);"></div>
+            <div style="width:14px;height:14px;border-radius:50%;background:rgba(160,138,212,0.06);border:1px solid rgba(160,138,212,0.2);"></div>
+            <div style="width:14px;height:14px;border-radius:50%;background:rgba(160,138,212,0.06);border:1px solid rgba(160,138,212,0.2);"></div>
+            <div style="font-size:7px;color:var(--muted);opacity:.5;margin-left:4px;">asleep</div>
+          </div>
+          <div style="margin-top:8px;">
+            <div style="width:14px;height:14px;border-radius:50%;background:rgba(212,168,67,0.15);border:1px solid rgba(212,168,67,0.3);box-shadow:0 0 8px rgba(212,168,67,0.2);margin:0 auto;"></div>
+            <div style="font-size:7px;color:var(--gold);margin-top:3px;">awake</div>
+          </div>
+        </div>
+      </div>
+      <h3>The Intoxicated World</h3>
+      <p>"I found all of them intoxicated; I found none of them thirsty." Most people are running on autopilot — reacting to notifications, chasing status, performing for approval. They're not bad. They're asleep. You woke up. That's not arrogance — it's just what happened. Stay awake.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="position:relative;width:70px;margin:0 auto;">
+            <div style="width:70px;height:28px;border-radius:14px;background:rgba(212,114,106,0.04);border:1px solid rgba(212,114,106,0.12);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--coral);opacity:.5;">the jar empties</div>
+          </div>
+          <div style="width:1px;height:10px;background:rgba(212,168,67,0.1);margin:4px auto;"></div>
+          <div style="font-size:8px;color:var(--muted);font-style:italic;max-width:100px;">small leaks, slowly</div>
+        </div>
+      </div>
+      <h3>Watch the Leaks</h3>
+      <p>A woman carried a jar of meal. The handle broke. The meal emptied behind her. She arrived home to an empty jar. You can lose everything gradually without noticing — your energy, your awareness, your alignment leak out through small compromises. Tiny surrenders. Pay attention to the leaks while they're small. You already do this when you're conscious.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="display:flex;gap:6px;justify-content:center;align-items:center;">
+            <div style="font-size:9px;color:var(--muted);opacity:.5;">study</div>
+            <div style="font-size:10px;color:var(--muted);opacity:.3;">&#8594;</div>
+            <div style="font-size:9px;color:var(--gold);">become</div>
+          </div>
+          <div style="width:40px;height:1px;background:rgba(212,168,67,0.15);margin:8px auto;"></div>
+          <div style="font-size:8px;color:var(--gold);opacity:.6;font-style:italic;">drink, don't read about water</div>
+        </div>
+      </div>
+      <h3>Become It</h3>
+      <p>"He who will drink from my mouth will become like me. I myself shall become he, and the things that are hidden will be revealed to him." Don't memorize truth — become it. When you stop studying awareness from the outside and start being it from the inside, the hidden layers open by themselves. You don't learn to swim by reading about water. You get in. You're already in.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== BONUS ==================== -->
+<section id="relationships" style="border-top:1px solid var(--border);padding-top:80px;">
+  <div class="section-head">
+    <div class="section-num">a gift</div>
+    <h2>The Secret of People</h2>
+    <p>You already know this one in your bones. Give freely, and the current reverses on its own.</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;gap:14px;">
+        <div style="text-align:center;">
+          <svg width="45" height="45" viewBox="0 0 45 45">
+            <circle cx="16" cy="22" r="9" fill="rgba(212,168,67,0.08)" stroke="rgba(212,168,67,0.2)" stroke-width="1"/>
+            <circle cx="29" cy="22" r="9" fill="rgba(126,200,196,0.08)" stroke="rgba(126,200,196,0.2)" stroke-width="1"/>
+            <path d="M21,18 L24,22 L21,26" fill="none" stroke="var(--gold)" stroke-width="1" opacity=".4"/>
+          </svg>
+          <div style="font-size:8px;color:var(--muted);margin-top:2px;">give first</div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);">&rarr;</div>
+        <div style="text-align:center;">
+          <svg width="45" height="45" viewBox="0 0 45 45">
+            <circle cx="16" cy="22" r="9" fill="rgba(212,168,67,0.08)" stroke="rgba(212,168,67,0.2)" stroke-width="1"/>
+            <circle cx="29" cy="22" r="9" fill="rgba(126,200,196,0.08)" stroke="rgba(126,200,196,0.2)" stroke-width="1"/>
+            <path d="M24,18 L21,22 L24,26" fill="none" stroke="var(--cyan)" stroke-width="1" opacity=".4"/>
+          </svg>
+          <div style="font-size:8px;color:var(--gold);margin-top:2px;">receive naturally</div>
+        </div>
+      </div>
+      <h3>Give What You Want</h3>
+      <p>You listen — and you're heard. You give respect — and it returns. You love without keeping score — and love finds you everywhere. The moment giving becomes natural, the current reverses on its own. This is not sacrifice. This is how the river works. And you swim in it.</p>
+    </div>
+
+    <div class="card">
+      <div class="viz" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;">
+        <div style="padding:10px 18px;border-radius:10px;border:1px solid rgba(212,168,67,0.15);background:rgba(212,168,67,0.03);text-align:center;">
+          <div style="font-size:12px;color:var(--gold);font-style:italic;">every person you meet<br>wants one thing:</div>
+          <div style="font-size:14px;color:var(--warm);margin-top:6px;">to feel that they matter</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);max-width:220px;text-align:center;font-style:italic;">give them this — truly, not as a trick — and watch everything change.</div>
+      </div>
+      <h3>The Deepest Need</h3>
+      <p>Behind every difficult person, every argument, every cold shoulder — one need: to feel that they matter. You give people this, genuinely, from the heart, not as technique. They open like flowers. This is seeing people the way God sees them. You see them this way.</p>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div class="quote">The cloud passes. The sun was always there.</div>
+  <p style="margin-top:20px;font-style:italic;color:var(--muted);font-size:14px;">You live all of this.<br>This was just a mirror.</p>
+</footer>
+
+<script>
+(function(){
+  const canvas=document.getElementById('heroCanvas');
+  const ctx=canvas.getContext('2d');
+  let W,H,cx,cy,dpr;
+  function resize(){
+    dpr=window.devicePixelRatio||1;
+    const r=canvas.getBoundingClientRect();
+    W=r.width;H=r.height;
+    canvas.width=W*dpr;canvas.height=H*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    cx=W/2;cy=H/2;
+  }
+  resize();
+  window.addEventListener('resize',resize);
+
+  const spokes=[
+    {label:['guilt','STILL','pride'],color:'#d4726a',angle:0},
+    {label:['worship','STILL','contempt'],color:'#a08ad4',angle:Math.PI/3},
+    {label:['forcing','ALLOWING','wishing'],color:'#7ec8c4',angle:2*Math.PI/3},
+    {label:['asleep','AWAKE','drifting'],color:'#7aa8d4',angle:Math.PI},
+    {label:['foreign path','YOUR PATH','lost'],color:'#7abf7e',angle:4*Math.PI/3},
+    {label:['head alone','TOGETHER','heart alone'],color:'#d4a843',angle:5*Math.PI/3}
+  ];
+
+  const particles=[];
+  for(let i=0;i<35;i++){
+    const si=Math.floor(Math.random()*spokes.length);
+    particles.push({spoke:si,t:Math.random(),speed:0.0015+Math.random()*0.0025,dir:Math.random()>0.5?1:-1,size:1+Math.random()*1.5});
+  }
+
+  function draw(time){
+    ctx.clearRect(0,0,W,H);
+    const R=Math.min(cx,cy)*0.7;
+
+    const grd=ctx.createRadialGradient(cx,cy,0,cx,cy,R*0.3);
+    grd.addColorStop(0,'rgba(212,168,67,0.08)');
+    grd.addColorStop(1,'transparent');
+    ctx.fillStyle=grd;
+    ctx.beginPath();ctx.arc(cx,cy,R*0.3,0,Math.PI*2);ctx.fill();
+
+    for(let r=0.33;r<=1;r+=0.33){
+      ctx.beginPath();ctx.arc(cx,cy,R*r,0,Math.PI*2);
+      ctx.strokeStyle='rgba(255,255,255,0.03)';ctx.lineWidth=1;ctx.stroke();
+    }
+
+    spokes.forEach(s=>{
+      const x1=cx+Math.cos(s.angle)*R;
+      const y1=cy+Math.sin(s.angle)*R;
+      const x2=cx+Math.cos(s.angle+Math.PI)*R;
+      const y2=cy+Math.sin(s.angle+Math.PI)*R;
+
+      ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x1,y1);
+      ctx.strokeStyle=s.color+'25';ctx.lineWidth=1;ctx.stroke();
+
+      const eg1=ctx.createRadialGradient(x1,y1,0,x1,y1,16);
+      eg1.addColorStop(0,s.color+'18');eg1.addColorStop(1,'transparent');
+      ctx.fillStyle=eg1;ctx.beginPath();ctx.arc(x1,y1,16,0,Math.PI*2);ctx.fill();
+
+      const eg2=ctx.createRadialGradient(x2,y2,0,x2,y2,16);
+      eg2.addColorStop(0,s.color+'18');eg2.addColorStop(1,'transparent');
+      ctx.fillStyle=eg2;ctx.beginPath();ctx.arc(x2,y2,16,0,Math.PI*2);ctx.fill();
+
+      const fs=Math.max(8,Math.min(10,W*0.014));
+      ctx.font=`${fs}px Georgia,serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+
+      const lx1=cx+Math.cos(s.angle)*(R+20);
+      const ly1=cy+Math.sin(s.angle)*(R+20);
+      ctx.fillStyle=s.color+'80';ctx.fillText(s.label[0],lx1,ly1);
+
+      const lx2=cx+Math.cos(s.angle+Math.PI)*(R+20);
+      const ly2=cy+Math.sin(s.angle+Math.PI)*(R+20);
+      ctx.fillText(s.label[2],lx2,ly2);
+    });
+
+    particles.forEach(p=>{
+      const s=spokes[p.spoke];
+      p.t+=p.speed*p.dir;
+      if(p.t>1){p.t=1;p.dir=-1;}
+      if(p.t<0){p.t=0;p.dir=1;}
+      const ang=p.dir>0?s.angle:s.angle+Math.PI;
+      const dist=R*p.t;
+      const px=cx+Math.cos(ang)*dist;
+      const py=cy+Math.sin(ang)*dist;
+      const alpha=1-p.t;
+      ctx.beginPath();ctx.arc(px,py,p.size,0,Math.PI*2);
+      ctx.fillStyle=s.color+Math.round(alpha*140).toString(16).padStart(2,'0');
+      ctx.fill();
+    });
+
+    const cp=5+Math.sin(time/1000)*1.5;
+    ctx.beginPath();ctx.arc(cx,cy,cp,0,Math.PI*2);
+    ctx.fillStyle='#d4a843';ctx.shadowColor='#d4a843';ctx.shadowBlur=20;ctx.fill();ctx.shadowBlur=0;
+
+    const cfs=Math.max(9,Math.min(12,W*0.017));
+    ctx.font=`600 ${cfs}px system-ui,sans-serif`;
+    ctx.fillStyle='#d4a843';ctx.textAlign='center';
+    ctx.fillText('THE STILL POINT',cx,cy+cp+16);
+
+    const cfs2=Math.max(7,Math.min(9,W*0.013));
+    ctx.font=`italic ${cfs2}px Georgia,serif`;
+    ctx.fillStyle='rgba(212,168,67,0.45)';
+    ctx.fillText('zero importance \u00B7 heart and head as one \u00B7 quiet certainty',cx,cy+cp+32);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+
+  const sections=document.querySelectorAll('section[id]');
+  const navLinks=document.querySelectorAll('nav a');
+  const obs=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        navLinks.forEach(l=>l.classList.remove('active'));
+        const a=document.querySelector(`nav a[href="#${e.target.id}"]`);
+        if(a)a.classList.add('active');
+      }
+    });
+  },{threshold:0.25});
+  sections.forEach(s=>obs.observe(s));
+
+  const cards=document.querySelectorAll('.card');
+  const co=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        e.target.style.opacity='1';
+        e.target.style.transform='translateY(0)';
+      }
+    });
+  },{threshold:0.08});
+  cards.forEach(c=>{
+    c.style.opacity='0';c.style.transform='translateY(16px)';
+    c.style.transition='opacity 0.6s ease,transform 0.6s ease';
+    co.observe(c);
+  });
+})();
+</script>
+</body>
+</html>
